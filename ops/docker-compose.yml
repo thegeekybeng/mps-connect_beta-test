@@ -1,0 +1,25 @@
+services:
+  api:
+    build:
+      context: ../api
+    container_name: wv-api
+    ports:
+      - "8000:8000"
+    environment:
+      MODEL_DIR: /app/artifacts_zs_hier_plus
+      PROVIDERS_JSON: /app/providers_map.json
+      FEEDBACK_PATH: /app/feedback/feedback.csv
+    volumes:
+      - ../api/artifacts_zs_hier_plus:/app/artifacts_zs_hier_plus:ro
+      - ../api/providers_map.json:/app/providers_map.json:ro
+      - ../feedback:/app/feedback
+    # API key is hardcoded in app.py as requested: mps-85-whampoa
+
+  web:
+    build:
+      context: ../web
+    container_name: wv-web
+    ports:
+      - "5173:80"
+    depends_on:
+      - api

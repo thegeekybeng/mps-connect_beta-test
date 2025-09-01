@@ -1,0 +1,67 @@
+{
+  "utilities_comms/electricity_spgroup": {
+    "type": "private",
+    "provider": "SP Group",
+    "channel": "https://www.spgroup.com.sg"
+  },
+  "utilities_comms/gas_city_energy": {
+    "type": "private",
+    "provider": "City Energy",
+    "channel": "https://www.cityenergy.com.sg"
+  },
+  "utilities_comms/broadband_home_internet": {
+    "type": "private",
+    "provider": "ISPs",
+    "providers": [
+      "Singtel",
+      "StarHub",
+      "M1",
+      "TPG"
+    ]
+  },
+  "utilities_comms/telecom_bills_singtel": {
+    "type": "private",
+    "provider": "Singtel"
+  },
+  "utilities_comms/telecom_bills_starhub": {
+    "type": "private",
+    "provider": "StarHub"
+  },
+  "utilities_comms/telecom_bills_m1": {
+    "type": "private",
+    "provider": "M1"
+  },
+  "utilities_comms/telecom_bills_tpg": {
+    "type": "private",
+    "provider": "TPG"
+  },
+  "housing/town_council_scc_arrears": {
+    "type": "quasi-public",
+    "provider": "Town Council",
+    "channel": "https://www.towncouncils.sg"
+  },
+  "housing/hdb_loan_arrears": {
+    "type": "public",
+    "provider": "HDB"
+  },
+  "employment/career_services_e2i": {
+    "type": "ngo",
+    "provider": "NTUC e2i"
+  },
+  "employment/career_services_wsg": {
+    "type": "public",
+    "provider": "WSG"
+  },
+  "social_support/comcare_short_mid_term": {
+    "type": "public",
+    "provider": "MSF/SSO"
+  },
+  "tax_finance/mortgage_arrears_bank": {
+    "type": "private",
+    "provider": "Banks"
+  },
+  "tax_finance/payment_plan_arrangement": {
+    "type": "generic",
+    "provider": "Multiple"
+  }
+}
