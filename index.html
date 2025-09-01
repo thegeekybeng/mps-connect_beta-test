@@ -1,9 +1,9 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>MPS Connect AI Classifier and Letter Generator — Beta Tester</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MPS Connect — Classifier & Letter Generator (Beta)</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
@@ -11,126 +11,150 @@
   </style>
 </head>
 <body class="bg-gray-50 text-gray-900">
-<div class="max-w-6xl mx-auto p-4 sm:p-6">
-  <header class="mb-4 sm:mb-6">
-    <h1 class="text-2xl font-semibold">MPS Connect AI Classifier and Letter Generator — Beta Tester</h1>
-    <p class="text-sm text-gray-600">Predict multi-label categories ➜ mark ground-truth ➜ auto-generate letters for agencies/providers. <span class="font-semibold">Do not paste sensitive PII on public tunnels.</span></p>
-  </header>
+  <div class="max-w-6xl mx-auto p-4 sm:p-6">
+    <header class="mb-4 sm:mb-6">
+      <h1 class="text-2xl font-semibold">MPS Connect — Classifier & Letter Generator (Beta)</h1>
+      <p class="text-sm text-gray-600">
+        Predict multi-label categories ➜ mark ground-truth ➜ auto-generate letters per agency/provider.
+        <span class="font-semibold">Do not paste sensitive PII on public tunnels.</span>
+      </p>
+    </header>
 
-  <!-- API Settings -->
-  <section class="bg-white shadow-sm rounded-xl p-4 sm:p-5 mb-6 border">
-    <h2 class="font-semibold mb-3">API Settings</h2>
-    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-      <label class="block">
-        <span class="text-sm">API Base URL</span>
-        <input id="apiBase" class="mt-1 w-full rounded-lg border px-3 py-2" placeholder="https://<your-tunnel>.trycloudflare.com"/>
-      </label>
-      <label class="block">
-        <span class="text-sm">X-API-Key (optional)</span>
-        <input id="apiKey" class="mt-1 w-full rounded-lg border px-3 py-2" placeholder="mps-85-whampoa"/>
-      </label>
-    </div>
-    <div class="grid grid-cols-2 sm:grid-cols-6 gap-4 mt-4">
-      <label class="block"><span class="text-sm">threshold_top</span><input id="thresholdTop" type="number" step="0.01" class="mt-1 w-full rounded-lg border px-3 py-2"/></label>
-      <label class="block"><span class="text-sm">threshold_child</span><input id="thresholdChild" type="number" step="0.01" class="mt-1 w-full rounded-lg border px-3 py-2"/></label>
-      <label class="block"><span class="text-sm">top_k_top</span><input id="topKTop" type="number" class="mt-1 w-full rounded-lg border px-3 py-2"/></label>
-      <label class="block"><span class="text-sm">top_k_child</span><input id="topKChild" type="number" class="mt-1 w-full rounded-lg border px-3 py-2"/></label>
-      <label class="block"><span class="text-sm">top_k_total</span><input id="topKTotal" type="number" class="mt-1 w-full rounded-lg border px-3 py-2"/></label>
-      <label class="block"><span class="text-sm">seed_prior_threshold</span><input id="seedPrior" type="number" step="0.01" class="mt-1 w-full rounded-lg border px-3 py-2"/></label>
-    </div>
-    <div class="flex items-center gap-4 mt-3">
-      <label class="inline-flex items-center gap-2">
-        <input id="usePriors" type="checkbox" class="rounded"/>
-        <span class="text-sm">Use co-occurrence priors</span>
-      </label>
-      <div class="ml-auto flex gap-2">
-        <button id="btnSave" class="px-3 py-2 rounded-lg bg-gray-900 text-white">Save</button>
-        <button id="btnHealth" class="px-3 py-2 rounded-lg border">Check /healthz</button>
+    <!-- Settings -->
+    <section class="bg-white shadow-sm rounded-xl p-4 sm:p-5 mb-6 border">
+      <h2 class="font-semibold mb-3">API Settings</h2>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <label class="block">
+          <span class="text-sm">API Base URL</span>
+          <input id="apiBase" class="mt-1 w-full rounded-lg border px-3 py-2" placeholder="https://<your-tunnel>.trycloudflare.com" />
+        </label>
+        <label class="block">
+          <span class="text-sm">X-API-Key</span>
+          <input id="apiKey" class="mt-1 w-full rounded-lg border px-3 py-2" placeholder="mps-85-whampoa" />
+        </label>
       </div>
-    </div>
-    <p id="healthOut" class="text-xs text-gray-600 mt-2"></p>
-  </section>
+      <div class="grid grid-cols-2 sm:grid-cols-6 gap-4 mt-4">
+        <label class="block">
+          <span class="text-sm">threshold_top</span>
+          <input id="thresholdTop" type="number" step="0.01" class="mt-1 w-full rounded-lg border px-3 py-2" />
+        </label>
+        <label class="block">
+          <span class="text-sm">threshold_child</span>
+          <input id="thresholdChild" type="number" step="0.01" class="mt-1 w-full rounded-lg border px-3 py-2" />
+        </label>
+        <label class="block">
+          <span class="text-sm">top_k_top</span>
+          <input id="topKTop" type="number" class="mt-1 w-full rounded-lg border px-3 py-2" />
+        </label>
+        <label class="block">
+          <span class="text-sm">top_k_child</span>
+          <input id="topKChild" type="number" class="mt-1 w-full rounded-lg border px-3 py-2" />
+        </label>
+        <label class="block">
+          <span class="text-sm">top_k_total</span>
+          <input id="topKTotal" type="number" class="mt-1 w-full rounded-lg border px-3 py-2" />
+        </label>
+        <label class="block">
+          <span class="text-sm">seed_prior_threshold</span>
+          <input id="seedPrior" type="number" step="0.01" class="mt-1 w-full rounded-lg border px-3 py-2" />
+        </label>
+      </div>
+      <div class="flex flex-wrap items-center gap-3 mt-3">
+        <label class="inline-flex items-center gap-2">
+          <input id="usePriors" type="checkbox" class="rounded" />
+          <span class="text-sm">Use co-occurrence priors</span>
+        </label>
+        <div class="ml-auto flex flex-wrap gap-2">
+          <button id="btnSave" class="px-3 py-2 rounded-lg bg-gray-900 text-white">Save</button>
+          <button id="btnHealth" class="px-3 py-2 rounded-lg border">Check /healthz</button>
+          <button id="btnShare" class="px-3 py-2 rounded-lg border">Copy share URL</button>
+          <button id="btnShareHash" class="px-3 py-2 rounded-lg border">Copy share URL (hash)</button>
+        </div>
+      </div>
+      <p id="healthOut" class="text-xs text-gray-600 mt-2"></p>
+    </section>
 
-  <!-- Case input -->
-  <section class="bg-white shadow-sm rounded-xl p-4 sm:p-5 mb-6 border">
-    <h2 class="font-semibold mb-3">Case Text</h2>
-    <textarea id="caseText" rows="5" class="w-full rounded-lg border px-3 py-2" placeholder="Describe the case in natural SG English…"></textarea>
-    <div class="mt-3 flex gap-2">
-      <button id="btnPredict" class="px-3 py-2 rounded-lg bg-blue-600 text-white">Predict</button>
-      <button id="btnClear" class="px-3 py-2 rounded-lg border">Clear</button>
-    </div>
-    <p id="errMsg" class="text-sm text-red-600 mt-2 hidden"></p>
-  </section>
+    <!-- Case input -->
+    <section class="bg-white shadow-sm rounded-xl p-4 sm:p-5 mb-6 border">
+      <h2 class="font-semibold mb-3">Case Text</h2>
+      <textarea id="caseText" rows="5" class="w-full rounded-lg border px-3 py-2" placeholder="Describe the case in natural SG English…"></textarea>
+      <div class="mt-3 flex gap-2">
+        <button id="btnPredict" class="px-3 py-2 rounded-lg bg-blue-600 text-white">Predict</button>
+        <button id="btnClear" class="px-3 py-2 rounded-lg border">Clear</button>
+      </div>
+      <p id="errMsg" class="text-sm text-red-600 mt-2 hidden"></p>
+    </section>
 
-  <!-- Results & Truth -->
-  <section class="bg-white shadow-sm rounded-xl p-4 sm:p-5 mb-6 border">
-    <div class="flex items-center justify-between mb-2">
-      <h2 class="font-semibold">Results</h2>
-      <div class="text-sm text-gray-600">Mark <span class="font-medium">Correct?</span> to compute P/R/F1; add any missing labels below.</div>
-    </div>
-    <div id="topCats" class="text-sm text-gray-700 mb-2"></div>
-    <div class="overflow-x-auto">
-      <table class="min-w-full text-sm">
-        <thead>
-        <tr class="bg-gray-100">
-          <th class="text-left px-3 py-2">Label</th>
-          <th class="text-left px-3 py-2">Score</th>
-          <th class="text-left px-3 py-2">Provider</th>
-          <th class="text-left px-3 py-2">Correct?</th>
-        </tr>
-        </thead>
-        <tbody id="predBody"></tbody>
-      </table>
-    </div>
+    <!-- Results & Truth -->
+    <section class="bg-white shadow-sm rounded-xl p-4 sm:p-5 mb-6 border">
+      <div class="flex items-center justify-between mb-2">
+        <h2 class="font-semibold">Results</h2>
+        <div class="text-sm text-gray-600">Mark <span class="font-medium">Correct?</span> to compute P/R/F1; add any missing labels below.</div>
+      </div>
+      <div id="topCats" class="text-sm text-gray-700 mb-2"></div>
+      <div class="overflow-x-auto">
+        <table class="min-w-full text-sm">
+          <thead>
+            <tr class="bg-gray-100">
+              <th class="text-left px-3 py-2">Label</th>
+              <th class="text-left px-3 py-2">Score</th>
+              <th class="text-left px-3 py-2">Provider</th>
+              <th class="text-left px-3 py-2">Correct?</th>
+            </tr>
+          </thead>
+          <tbody id="predBody"></tbody>
+        </table>
+      </div>
 
-    <div class="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
-      <label class="block">
-        <span class="text-sm">Add missing ground-truth label (slug)</span>
-        <input id="addTruth" class="mt-1 w-full rounded-lg border px-3 py-2 mono" placeholder="e.g. utilities_comms/electricity_spgroup"/>
+      <div class="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <label class="block">
+          <span class="text-sm">Add missing ground-truth label (slug)</span>
+          <input id="addTruth" class="mt-1 w-full rounded-lg border px-3 py-2 mono" placeholder="e.g. utilities_comms/electricity_spgroup" />
+        </label>
+        <button id="btnAddTruth" class="self-end px-3 py-2 rounded-lg border">Add</button>
+        <div class="self-end text-sm text-gray-600">Ground truth set is “checked predictions” + “added labels”.</div>
+      </div>
+
+      <div class="mt-4 flex flex-wrap items-center gap-3 text-sm">
+        <span id="metricPRF" class="px-2 py-1 rounded bg-gray-100 border"></span>
+        <button id="btnExportCSV" class="px-3 py-2 rounded-lg border">Export feedback row (CSV)</button>
+      </div>
+    </section>
+
+    <!-- Letter generation -->
+    <section class="bg-white shadow-sm rounded-xl p-4 sm:p-5 mb-6 border">
+      <h2 class="font-semibold mb-3">Generate Letters</h2>
+      <p class="text-sm text-gray-600 mb-3">Fill contact fields once. Letters are generated per selected label (checked as Correct?). You can edit templates inline before download.</p>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <label class="block"><span class="text-sm">Citizen Full Name</span><input id="fName" class="mt-1 w-full rounded-lg border px-3 py-2" /></label>
+        <label class="block"><span class="text-sm">NRIC/FIN</span><input id="fNRIC" class="mt-1 w-full rounded-lg border px-3 py-2" /></label>
+        <label class="block"><span class="text-sm">Contact Email</span><input id="fEmail" class="mt-1 w-full rounded-lg border px-3 py-2" /></label>
+        <label class="block"><span class="text-sm">Contact Phone</span><input id="fPhone" class="mt-1 w-full rounded-lg border px-3 py-2" /></label>
+        <label class="block sm:col-span-2"><span class="text-sm">Postal Address</span><input id="fAddr" class="mt-1 w-full rounded-lg border px-3 py-2" /></label>
+      </div>
+      <label class="inline-flex items-center gap-2 mt-3">
+        <input id="pdpaSafe" type="checkbox" class="rounded" checked>
+        <span class="text-sm">PDPA-safe mode (omit personal details in letters)</span>
       </label>
-      <button id="btnAddTruth" class="self-end px-3 py-2 rounded-lg border">Add</button>
-      <div class="self-end text-sm text-gray-600">Ground truth set is “checked predictions” + “added labels”.</div>
-    </div>
+      <div class="mt-3 flex gap-2">
+        <button id="btnGenLetters" class="px-3 py-2 rounded-lg bg-emerald-600 text-white">Generate Letters</button>
+        <button id="btnCopyAll" class="px-3 py-2 rounded-lg border">Copy all</button>
+      </div>
+      <div id="lettersWrap" class="mt-4 space-y-6"></div>
+    </section>
 
-    <div class="mt-4 flex flex-wrap items-center gap-3 text-sm">
-      <span id="metricPRF" class="px-2 py-1 rounded bg-gray-100 border"></span>
-      <button id="btnExportCSV" class="px-3 py-2 rounded-lg border">Export feedback row (CSV)</button>
-    </div>
-  </section>
-
-  <!-- Letters -->
-  <section class="bg-white shadow-sm rounded-xl p-4 sm:p-5 mb-6 border">
-    <h2 class="font-semibold mb-3">Generate Letters</h2>
-    <p class="text-sm text-gray-600 mb-3">Fill contact fields once. Letters are generated per selected label (checked as Correct?). You can edit templates inline before download.</p>
-    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-      <label class="block"><span class="text-sm">Citizen Full Name</span><input id="fName" class="mt-1 w-full rounded-lg border px-3 py-2"/></label>
-      <label class="block"><span class="text-sm">NRIC/FIN</span><input id="fNRIC" class="mt-1 w-full rounded-lg border px-3 py-2"/></label>
-      <label class="block"><span class="text-sm">Contact Email</span><input id="fEmail" class="mt-1 w-full rounded-lg border px-3 py-2"/></label>
-      <label class="block"><span class="text-sm">Contact Phone</span><input id="fPhone" class="mt-1 w-full rounded-lg border px-3 py-2"/></label>
-      <label class="block sm:col-span-2"><span class="text-sm">Postal Address</span><input id="fAddr" class="mt-1 w-full rounded-lg border px-3 py-2"/></label>
-    </div>
-    <label class="inline-flex items-center gap-2 mt-3">
-      <input id="pdpaSafe" type="checkbox" class="rounded" checked>
-      <span class="text-sm">PDPA-safe mode (omit personal details in letters)</span>
-    </label>
-    <div class="mt-3 flex gap-2">
-      <button id="btnGenLetters" class="px-3 py-2 rounded-lg bg-emerald-600 text-white">Generate Letters</button>
-      <button id="btnCopyAll" class="px-3 py-2 rounded-lg border">Copy all</button>
-    </div>
-    <div id="lettersWrap" class="mt-4 space-y-6"></div>
-  </section>
-
-  <footer class="text-xs text-gray-500 pb-8">
-    v0.2 — Client-side tester. Templates are generic; adapt before real use. No server-side storage.
-  </footer>
-</div>
+    <footer class="text-xs text-gray-500 pb-8">
+      v0.2 — Client-side tester. Templates are generic; adapt before real use. No server-side storage.
+    </footer>
+  </div>
 
 <script>
+// ---------- Helpers ----------
 const qs = id => document.getElementById(id);
 const state = { preds: null, truthAdd: new Set(), checked: new Set() };
 
 const DEFAULTS = {
-  apiBase: localStorage.getItem('wv.apiBase') || '',
+  apiBase: localStorage.getItem('wv.apiBase') || 'http://localhost:8000',
   apiKey: localStorage.getItem('wv.apiKey') || 'mps-85-whampoa',
   thresholdTop: parseFloat(localStorage.getItem('wv.thTop') || '0.30'),
   thresholdChild: parseFloat(localStorage.getItem('wv.thChild') || '0.36'),
@@ -165,10 +189,94 @@ function saveSettings() {
   localStorage.setItem('wv.usePriors', qs('usePriors').checked);
 }
 
+// ---------- URL param wiring ----------
+function readQuery() { return new URLSearchParams(window.location.search); }
+function boolFrom(v, def=false) {
+  if (v === null || v === undefined) return def;
+  return v === '1' || v === 'true';
+}
+function numFrom(v, def) {
+  if (v === null || v === undefined || v === '') return def;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : def;
+}
+// Optional Base64 JSON in hash: #cfg=<b64>
+function readHashCfg() {
+  const m = location.hash.match(/[#&]cfg=([^&]+)/);
+  if (!m) return {};
+  try { return JSON.parse(atob(m[1])); } catch { return {}; }
+}
+function queryOverrides() {
+  const q = readQuery();
+  const h = readHashCfg();
+  const get = (k) => (h[k] !== undefined ? String(h[k]) : (q.get(k) ?? null));
+  return {
+    api:         get('api'),
+    key:         get('key'),
+    thTop:       get('thTop'),
+    thChild:     get('thChild'),
+    kTop:        get('kTop'),
+    kChild:      get('kChild'),
+    kTotal:      get('kTotal'),
+    seedPrior:   get('seedPrior'),
+    priors:      get('priors'),
+    pdpa:        get('pdpa'),
+    text:        get('text'),
+    autopredict: get('autopredict'),
+  };
+}
+function applyQueryOverridesToUI() {
+  const ov = queryOverrides();
+  if (ov.api)        qs('apiBase').value = ov.api;
+  if (ov.key)        qs('apiKey').value = ov.key;
+
+  if (ov.thTop)      qs('thresholdTop').value   = numFrom(ov.thTop,   Number(qs('thresholdTop').value));
+  if (ov.thChild)    qs('thresholdChild').value = numFrom(ov.thChild, Number(qs('thresholdChild').value));
+  if (ov.kTop)       qs('topKTop').value        = parseInt(ov.kTop);
+  if (ov.kChild)     qs('topKChild').value      = parseInt(ov.kChild);
+  if (ov.kTotal)     qs('topKTotal').value      = parseInt(ov.kTotal);
+  if (ov.seedPrior)  qs('seedPrior').value      = numFrom(ov.seedPrior, Number(qs('seedPrior').value));
+  if (ov.priors !== null) qs('usePriors').checked = boolFrom(ov.priors, qs('usePriors').checked);
+  if (ov.pdpa  !== null)  qs('pdpaSafe').checked  = boolFrom(ov.pdpa,  qs('pdpaSafe').checked);
+  if (ov.text)       qs('caseText').value = ov.text;
+}
+
+// Build shareable URLs
+function buildShareUrl({useHash=false} = {}) {
+  const cfg = {
+    api: qs('apiBase').value.trim(),
+    key: qs('apiKey').value.trim(),
+    thTop: qs('thresholdTop').value,
+    thChild: qs('thresholdChild').value,
+    kTop: qs('topKTop').value,
+    kChild: qs('topKChild').value,
+    kTotal: qs('topKTotal').value,
+    seedPrior: qs('seedPrior').value,
+    priors: qs('usePriors').checked ? '1' : '0',
+    pdpa: qs('pdpaSafe').checked ? '1' : '0',
+    text: qs('caseText').value.trim(),
+  };
+  const base = location.origin + location.pathname;
+  if (useHash) {
+    const b64 = btoa(JSON.stringify(cfg));
+    return `${base}#cfg=${b64}`;
+  } else {
+    const p = new URLSearchParams(cfg);
+    return `${base}?${p.toString()}`;
+  }
+}
+async function copy(text) { try { await navigator.clipboard.writeText(text); } catch (_) {} }
+
+// ---------- API calls ----------
 async function healthz() {
   qs('healthOut').textContent = 'Checking…';
   try {
-    const r = await fetch(qs('apiBase').value.replace(/\/$/, '') + '/healthz'); // no headers
+    const r = await fetch(qs('apiBase').value.replace(/\/$/, '') + '/healthz', {
+      headers: {
+        ...(qs('apiKey').value.trim() ? {'X-API-Key': qs('apiKey').value.trim()} : {})
+      }
+    });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
     const j = await r.json();
     qs('healthOut').textContent = `OK — labels: ${j.labels}, tops: ${j.tops}`;
   } catch (e) {
@@ -178,23 +286,34 @@ async function healthz() {
 
 function renderPreds(resp) {
   const p = resp?.predictions?.[0];
-  state.preds = p || null; state.checked = new Set();
+  state.preds = p || null; state.checked = new Set(); state.truthAdd = new Set();
   const topCats = p?.top_categories || [];
-  qs('topCats').innerHTML = topCats.map(tc => `<span class="badge mr-1">${tc.top} <span class="text-gray-500">${(+tc.score).toFixed(3)}</span></span>`).join('');
-  const tbody = qs('predBody'); tbody.innerHTML = '';
+  qs('topCats').innerHTML = topCats.map(tc =>
+    `<span class="badge mr-1">${tc.top} <span class="text-gray-500">${Number(tc.score).toFixed(3)}</span></span>`
+  ).join('');
+
+  const tbody = qs('predBody');
+  tbody.innerHTML = '';
   if (!p) return;
-  const labels = p.labels || []; const scores = p.scores || {}; const providers = p.providers || {};
+  const labels = p.labels || [];
+  const scores = p.scores || {};
+  const providers = p.providers || {};
   labels.forEach(lab => {
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td class="px-3 py-2 mono">${lab}</td>
       <td class="px-3 py-2">${(scores[lab] ?? 0).toFixed(3)}</td>
       <td class="px-3 py-2 text-sm">${renderProvider(providers[lab])}</td>
-      <td class="px-3 py-2"><input type="checkbox" class="rounded" data-lab="${lab}"></td>`;
+      <td class="px-3 py-2"><input type="checkbox" class="rounded" data-lab="${lab}"></td>
+    `;
     tbody.appendChild(tr);
   });
+
   tbody.querySelectorAll('input[type=checkbox]').forEach(cb => {
-    cb.addEventListener('change', () => { if (cb.checked) state.checked.add(cb.dataset.lab); else state.checked.delete(cb.dataset.lab); updateMetrics(); });
+    cb.addEventListener('change', () => {
+      if (cb.checked) state.checked.add(cb.dataset.lab); else state.checked.delete(cb.dataset.lab);
+      updateMetrics();
+    });
   });
   updateMetrics();
 }
@@ -206,17 +325,21 @@ function renderProvider(p) {
   return `<span class="font-medium">${name}</span><span class="text-gray-500"> (${p.type || '—'})</span>${ch}`;
 }
 
-function currentTruthSet() { return new Set([...state.checked, ...state.truthAdd]); }
+function currentTruthSet() {
+  const truth = new Set([...state.checked, ...state.truthAdd]);
+  return truth;
+}
 
 function updateMetrics() {
   const p = state.preds; if (!p) { qs('metricPRF').textContent = ''; return; }
-  const pred = new Set(p.labels || []); const truth = currentTruthSet();
+  const pred = new Set(p.labels || []);
+  const truth = currentTruthSet();
   let TP=0, FP=0, FN=0;
   pred.forEach(l => { if (truth.has(l)) TP++; else FP++; });
   truth.forEach(l => { if (!pred.has(l)) FN++; });
   const prec = TP + FP === 0 ? 0 : TP / (TP + FP);
   const rec  = TP + FN === 0 ? 0 : TP / (TP + FN);
-  const f1   = (prec + rec) === 0 ? 0 : (2*prec*rec)/(prec+rec);
+  const f1   = (prec + rec) === 0 ? 0 : (2 * prec * rec) / (prec + rec);
   qs('metricPRF').textContent = `TP ${TP} · FP ${FP} · FN ${FN} — P ${(prec*100).toFixed(1)}% · R ${(rec*100).toFixed(1)}% · F1 ${(f1*100).toFixed(1)}%`;
 }
 
@@ -238,7 +361,8 @@ function exportCSV() {
   };
   const header = Object.keys(row).join(',');
   const data = Object.values(row).map(v => '"' + String(v).replaceAll('"','""') + '"').join(',');
-  downloadFile('wv_feedback.csv', header + '\n' + data + '\n', 'text/csv');
+  const csv = header + '\n' + data + '\n';
+  downloadFile('wv_feedback.csv', csv, 'text/csv');
 }
 
 function downloadFile(name, content, mime='text/plain') {
@@ -252,27 +376,46 @@ function letterTemplates(label, provider, fields, caseText) {
   const today = new Date().toISOString().slice(0,10);
   const pdpa = !!fields.pdpa;
   const ref = 'WV-TEST-' + Math.floor(Math.random()*1e6).toString().padStart(6,'0');
-  let baseHdr = ''; let refLine = '';
-  if (pdpa) refLine = `Reference: ${ref} (PDPA-safe, no PII)\n`;
-  else baseHdr = `${fields.name ? fields.name : ''}${fields.nric ? ` (NRIC/FIN: ${fields.nric})` : ''}\n${fields.addr || ''}\n${fields.email ? `Email: ${fields.email}` : ''}${fields.phone ? `  Tel: ${fields.phone}` : ''}`;
+  let baseHdr = '';
+  let refLine = '';
+  if (pdpa) {
+    refLine = `Reference: ${ref} (PDPA-safe, no PII)\n`;
+  } else {
+    baseHdr = `${fields.name ? fields.name : ''}${fields.nric ? ` (NRIC/FIN: ${fields.nric})` : ''}\n${fields.addr || ''}\n${fields.email ? `Email: ${fields.email}` : ''}${fields.phone ? `  Tel: ${fields.phone}` : ''}`;
+  }
   const headerBlock = refLine + (baseHdr ? baseHdr + '\n\n' : '');
-  const sal = 'Dear Sir/Madam,'; const closing = `\n\nYours faithfully,\n${fields.name || ''}`; const desc = caseText || ''; const provName = provider?.provider || 'the relevant agency';
+  const sal = 'Dear Sir/Madam,';
+  const closing = `\n\nYours faithfully,\n${fields.name || ''}`;
+  const desc = caseText || '';
+  const provName = provider?.provider || 'the relevant agency';
+
   const T = {
-    'social_support/comcare_short_mid_term': () => `Date: ${today}\n\n${headerBlock}${provName}\n\n${sal}\n\nRE: Application for ComCare Short-to-Medium Term Assistance\n\nI am writing to request financial assistance due to prolonged unemployment and arrears. Summary:\n• Employment status: unemployed (≥ 2 years).\n• Outstanding bills: utilities, S&CC, housing.\n• Immediate needs: basic living expenses while I seek employment.\n\n${desc}\n\nI would be grateful for an expedited assessment and guidance on required documents.${closing}`,
-    'employment/career_services_e2i': () => `Date: ${today}\n\n${headerBlock}NTUC e2i\n\n${sal}\n\nRE: Request for Career Coaching and Job Matching\n\nI seek support for job search, coaching and suitable training pathways.\n${desc}\n\nPlease advise the next available appointment and any documents to bring.${closing}`,
-    'utilities_comms/electricity_spgroup': () => `Date: ${today}\n\n${headerBlock}SP Group\n\n${sal}\n\nRE: Appeal for Payment Arrangement — Electricity Account\n\nI request a payment plan to clear arrears while I stabilise income.\nAccount details (if known): [Account No], [Service Address].\nReason: temporary financial hardship.\n\nProposed arrangement: [e.g., $X per month], with reconnection upon first payment if applicable.${closing}`,
-    'housing/town_council_scc_arrears': () => `Date: ${today}\n\n${headerBlock}Town Council\n\n${sal}\n\nRE: Appeal / Instalment Plan for S&CC Arrears\n\nI request to restructure outstanding Service & Conservancy Charges due to financial hardship.\nEstate/Block/Unit: [Blk XX, #XX-XX].\n\nI propose to pay by instalments and keep current charges up to date.${closing}`,
-    'housing/hdb_loan_arrears': () => `Date: ${today}\n\n${headerBlock}Housing & Development Board\n\n${sal}\n\nRE: Request for HDB Loan Arrears Arrangement\n\nI am seeking an instalment plan / deferment while I secure employment.\nFlat address: [Blk/Street/Unit].\nLoan reference: [if known].\n\nBackground:\n${desc}\n\nI will maintain future payments and comply with the agreed schedule.${closing}`,
+    'social_support/comcare_short_mid_term': () => `Date: ${today}\n\n${headerBlock}\n\n${provName}\n\n${sal}\n\nRE: Application for ComCare Short-to-Medium Term Assistance\n\nI am writing to request financial assistance due to prolonged unemployment and arrears. Summary:\n• Employment status: unemployed (≥ 2 years).\n• Outstanding bills: utilities, S&CC, housing.\n• Immediate needs: basic living expenses while I seek employment.\n\n${desc}\n\nI would be grateful for an expedited assessment and guidance on required documents. ${closing}`,
+
+    'employment/career_services_e2i': () => `Date: ${today}\n\n${headerBlock}\n\nNTUC e2i\n\n${sal}\n\nRE: Request for Career Coaching and Job Matching\n\nI seek support for job search, coaching and suitable training pathways. My recent background:\n${desc}\n\nPlease advise the next available appointment and any documents to bring. ${closing}`,
+
+    'utilities_comms/electricity_spgroup': () => `Date: ${today}\n\n${headerBlock}\n\nSP Group\n\n${sal}\n\nRE: Appeal for Payment Arrangement — Electricity Account\n\nI request a payment plan to clear arrears while I stabilise income.\nAccount details (if known): [Account No], [Service Address].\nReason: temporary financial hardship.\n\nProposed arrangement: [e.g., $X per month], with reconnection upon first payment if applicable. ${closing}`,
+
+    'housing/town_council_scc_arrears': () => `Date: ${today}\n\n${headerBlock}\n\nTown Council\n\n${sal}\n\nRE: Appeal / Instalment Plan for S&CC Arrears\n\nI request to restructure outstanding Service & Conservancy Charges due to financial hardship.\nEstate/Block/Unit: [Blk XX, #XX-XX].\n\nI propose to pay by instalments and keep current charges up to date. ${closing}`,
+
+    'housing/hdb_loan_arrears': () => `Date: ${today}\n\n${headerBlock}\n\nHousing & Development Board\n\n${sal}\n\nRE: Request for HDB Loan Arrears Arrangement\n\nI am seeking an instalment plan / deferment while I secure employment.\nFlat address: [Blk/Street/Unit].\nLoan reference: [if known].\n\nBackground:\n${desc}\n\nI will maintain future payments and comply with the agreed schedule. ${closing}`,
   };
   const f = T[label];
-  return (f ? f() : `Date: ${today}\n\n${headerBlock}${provName}\n\n${sal}\n\nRE: Assistance Request\n\n${desc}\n\nI appreciate your consideration.${closing}`);
+  return (f ? f() : `Date: ${today}\n\n${headerBlock}\n\n${provName}\n\n${sal}\n\nRE: Assistance Request\n\n${desc}\n\nI appreciate your consideration. ${closing}`);
 }
 
 function generateLetters() {
   const p = state.preds; if (!p) return;
   const selected = [...state.checked];
   const providers = p.providers || {};
-  const fields = { name: qs('fName').value.trim(), nric: qs('fNRIC').value.trim(), email: qs('fEmail').value.trim(), phone: qs('fPhone').value.trim(), addr: qs('fAddr').value.trim(), pdpa: qs('pdpaSafe').checked };
+  const fields = {
+    name: qs('fName').value.trim(),
+    nric: qs('fNRIC').value.trim(),
+    email: qs('fEmail').value.trim(),
+    phone: qs('fPhone').value.trim(),
+    addr: qs('fAddr').value.trim(),
+    pdpa: qs('pdpaSafe').checked
+  };
   const caseText = qs('caseText').value.trim();
   const wrap = qs('lettersWrap'); wrap.innerHTML = '';
   selected.forEach(lab => {
@@ -282,9 +425,88 @@ function generateLetters() {
     el.className = 'border rounded-lg p-3';
     el.innerHTML = `
       <div class="flex items-center justify-between mb-2">
-        <div><div class="text-sm text-gray-500">Label</div><div class="font-medium mono">${lab}</div><div class="text-sm text-gray-600">${prov.provider ? 'Provider: ' + prov.provider : ''}</div></div>
-        <div class="flex gap-2"><button class="px-2 py-1 text-sm rounded border" data-act="copy">Copy</button><button class="px-2 py-1 text-sm rounded border" data-act="download">Download .txt</button></div>
+        <div>
+          <div class="text-sm text-gray-500">Label</div>
+          <div class="font-medium mono">${lab}</div>
+          <div class="text-sm text-gray-600">${prov.provider ? 'Provider: ' + prov.provider : ''}</div>
+        </div>
+        <div class="flex gap-2">
+          <button class="px-2 py-1 text-sm rounded border" data-act="copy">Copy</button>
+          <button class="px-2 py-1 text-sm rounded border" data-act="download">Download .txt</button>
+        </div>
       </div>
-      <textarea class="w-full rounded-lg border px-3 py-2 mono" rows="12">${body.replaceAll('<','&lt;')}</textarea>`;
-    el.querySelector('[data-act=copy]').addEventListener('click', async () => { const text = el.querySelector('textarea').value; await navigator.clipboard.writeText(text); });
-    el.querySelector('[data-act=download]').addEventListener('click', () => { const text = el.querySelector('textarea').value; const
+      <textarea class="w-full rounded-lg border px-3 py-2 mono" rows="12">${body.replaceAll('<','&lt;')}</textarea>
+    `;
+    el.querySelector('[data-act=copy]').addEventListener('click', async () => {
+      const text = el.querySelector('textarea').value; await navigator.clipboard.writeText(text);
+    });
+    el.querySelector('[data-act=download]').addEventListener('click', () => {
+      const text = el.querySelector('textarea').value;
+      const fname = lab.replaceAll('/','_') + '.txt';
+      downloadFile(fname, text, 'text/plain');
+    });
+    wrap.appendChild(el);
+  });
+}
+
+async function predictOnce() {
+  qs('errMsg').classList.add('hidden');
+  saveSettings();
+  const payload = {
+    texts: [qs('caseText').value.trim()],
+    threshold_top: parseFloat(qs('thresholdTop').value),
+    threshold_child: parseFloat(qs('thresholdChild').value),
+    top_k_top: parseInt(qs('topKTop').value),
+    top_k_child: parseInt(qs('topKChild').value),
+    top_k_total: parseInt(qs('topKTotal').value),
+    seed_prior_threshold: parseFloat(qs('seedPrior').value),
+    use_priors: qs('usePriors').checked,
+    return_providers: true
+  };
+  if (!payload.texts[0]) { qs('errMsg').textContent = 'Enter case text.'; qs('errMsg').classList.remove('hidden'); return; }
+  try {
+    const r = await fetch(qs('apiBase').value.replace(/\/$/, '') + '/predict', {
+      method: 'POST', headers: {
+        'Content-Type': 'application/json',
+        ...(qs('apiKey').value.trim() ? {'X-API-Key': qs('apiKey').value.trim()} : {})
+      }, body: JSON.stringify(payload)
+    });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const j = await r.json();
+    renderPreds(j);
+  } catch (e) {
+    qs('errMsg').textContent = 'Predict failed: ' + (e?.message || e);
+    qs('errMsg').classList.remove('hidden');
+  }
+}
+
+function copyAllLetters() {
+  const texts = [...document.querySelectorAll('#lettersWrap textarea')].map(t => t.value).join('\n\n---\n\n');
+  if (texts) navigator.clipboard.writeText(texts);
+}
+
+// ---------- Wire up ----------
+initForm();
+applyQueryOverridesToUI();
+qs('btnSave').addEventListener('click', saveSettings);
+qs('btnHealth').addEventListener('click', healthz);
+qs('btnPredict').addEventListener('click', predictOnce);
+qs('btnClear').addEventListener('click', () => {
+  qs('caseText').value=''; qs('predBody').innerHTML=''; qs('topCats').innerHTML='';
+  state.preds=null; state.checked.clear(); state.truthAdd.clear(); updateMetrics(); qs('lettersWrap').innerHTML='';
+});
+qs('btnAddTruth').addEventListener('click', addTruth);
+qs('btnExportCSV').addEventListener('click', exportCSV);
+qs('btnGenLetters').addEventListener('click', generateLetters);
+qs('btnCopyAll').addEventListener('click', copyAllLetters);
+qs('btnShare').addEventListener('click', async () => { const url = buildShareUrl({useHash:false}); await copy(url); alert('Share URL copied to clipboard.'); });
+qs('btnShareHash').addEventListener('click', async () => { const url = buildShareUrl({useHash:true}); await copy(url); alert('Share URL (hash) copied to clipboard.'); });
+
+// Auto actions from URL
+const ov = queryOverrides();
+if (ov.autopredict && boolFrom(ov.autopredict, false)) {
+  setTimeout(predictOnce, 200);
+}
+</script>
+</body>
+</html>
