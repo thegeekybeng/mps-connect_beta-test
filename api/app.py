@@ -20,9 +20,10 @@ def require_api_key(x_api_key: Optional[str]):
     if x_api_key != API_KEY:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
+# --- keep this near your other routes in app.py ---
 @app.get("/healthz")
 def healthz():
-    # No API key here — avoids preflight when you call it from the browser
+    # Return whatever summary you like; keep it simple.
     return {"ok": True, "labels": 129, "tops": 18}
 
 class PredictIn(BaseModel):
