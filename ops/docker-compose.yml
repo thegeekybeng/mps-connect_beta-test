@@ -1,21 +1,32 @@
+# ops/docker-compose.yml
 services:
   api:
     build:
-      context: ../api
-    container_name: mpsconnect_testers_api
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: mpsconnect_api
     environment:
-      MODEL_DIR: /app/artifacts_zs_hier_plus
-      PROVIDERS_JSON: /app/providers_map.json
-    volumes:
-      - ../api/artifacts_zs_hier_plus:/app/artifacts_zs_hier_plus:ro
-      - ../api/providers_map.json:/app/providers_map.json:ro
+      - MODEL_DIR=/app/artifacts_zs_hier_plus
+      - PROVIDERS_JSON=/app/providers_map.json
+      - UVICORN_HOST=0.0.0.0
+      - UVICORN_PORT=8000
     ports:
       - "8000:8000"
+    volumes:
+      - ./api/artifacts_zs_hier_plus:/app/artifacts_zs_hier_plus:ro
+      - ./api/providers_map.json:/app/providers_map.json:ro
+    command: uvicorn app:app --host 0.0.0.0 --port 8000
+    restart: unless-stopped
+
   web:
     build:
-      context: ../web
-    container_name: mpsconnect_testers_web
+      context: ./web
+      dockerfile: Dockerfile
+    container_name: mpsconnect_web
     ports:
-      - "5173:80"
-    depends_on:
-    - api
+      - "8080:80"
+    restart: unless-stopped
+
+networks:
+  default:
+    driver: bridge
