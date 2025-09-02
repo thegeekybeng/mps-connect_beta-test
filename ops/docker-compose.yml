@@ -1,27 +1,21 @@
-version: "3.9"
-
 services:
   api:
     build:
       context: ../api
-    container_name: wv-api
+    container_name: mpsconnect_testers_api
     environment:
       MODEL_DIR: /app/artifacts_zs_hier_plus
       PROVIDERS_JSON: /app/providers_map.json
-      FEEDBACK_PATH: /app/feedback/feedback.csv
-      SENTENCE_MODEL_NAME: sentence-transformers/all-MiniLM-L6-v2
     volumes:
       - ../api/artifacts_zs_hier_plus:/app/artifacts_zs_hier_plus:ro
       - ../api/providers_map.json:/app/providers_map.json:ro
-      - ../feedback:/app/feedback
     ports:
       - "8000:8000"
-
   web:
     build:
       context: ../web
-    container_name: wv-web
+    container_name: mpsconnect_testers_web
     ports:
       - "5173:80"
     depends_on:
-      - api
+    - api

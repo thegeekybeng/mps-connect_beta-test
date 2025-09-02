@@ -3,21 +3,29 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>MPS Connect — Classifier & Letter Generator (Beta)</title>
+  <title>MPS Connect — AI Classifier & Letter Generator (Beta)</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
     .badge { padding: 0.125rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem; background-color: rgb(243 244 246); border: 1px solid rgb(229 231 235); }
+    .scroll-pane { max-height: 18rem; overflow: auto; }
+    .btn { @apply px-3 py-2 rounded-lg border; }
+    .btn-primary { @apply px-3 py-2 rounded-lg bg-blue-600 text-white; }
+    .btn-ghost { @apply px-2 py-1 text-sm rounded border; }
+    .btn-green { @apply px-2 py-1 text-sm rounded bg-emerald-600 text-white; }
+    .btn-red { @apply px-2 py-1 text-sm rounded bg-red-600 text-white; }
+    .btn-amber { @apply px-2 py-1 text-sm rounded bg-amber-500 text-white; }
   </style>
 </head>
 <body class="bg-gray-50 text-gray-900">
   <div class="max-w-6xl mx-auto p-4 sm:p-6">
     <header class="mb-4 sm:mb-6">
-      <h1 class="text-2xl font-semibold">MPS Connect — Classifier & Letter Generator (Beta)</h1>
+      <h1 class="text-2xl font-semibold">MPS Connect — AI Classifier & Letter Generator (Beta)</h1>
       <p class="text-sm text-gray-600">
-        Predict multi-label categories ➜ mark ground-truth ➜ auto-generate letters per agency/provider.
-        <span class="font-semibold">Do not paste sensitive PII on public tunnels.</span>
+        Predict multi-label categories ➜ use the chooser to add/correct labels ➜ generate letters per label.
+        <span class="font-semibold">Avoid PII during public testing.</span>
       </p>
+      <p id="urlNotice" class="text-xs text-amber-700 mt-1 hidden">Settings loaded from URL parameters.</p>
     </header>
 
     <!-- Settings -->
@@ -26,11 +34,13 @@
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <label class="block">
           <span class="text-sm">API Base URL</span>
-          <input id="apiBase" class="mt-1 w-full rounded-lg border px-3 py-2" placeholder="https://<your-tunnel>.trycloudflare.com" />
+          <input id="apiBase" class="mt-1 w-full rounded-lg border px-3 py-2"
+                 placeholder="https://api.mpsconnect.thegeekybeng.com" />
         </label>
         <label class="block">
           <span class="text-sm">X-API-Key</span>
-          <input id="apiKey" class="mt-1 w-full rounded-lg border px-3 py-2" placeholder="mps-85-whampoa" />
+          <input id="apiKey" class="mt-1 w-full rounded-lg border px-3 py-2"
+                 placeholder="mps-85-whampoa" />
         </label>
       </div>
       <div class="grid grid-cols-2 sm:grid-cols-6 gap-4 mt-4">
@@ -59,37 +69,51 @@
           <input id="seedPrior" type="number" step="0.01" class="mt-1 w-full rounded-lg border px-3 py-2" />
         </label>
       </div>
-      <div class="flex flex-wrap items-center gap-3 mt-3">
+      <div class="flex items-center gap-4 mt-3">
         <label class="inline-flex items-center gap-2">
           <input id="usePriors" type="checkbox" class="rounded" />
           <span class="text-sm">Use co-occurrence priors</span>
         </label>
-        <div class="ml-auto flex flex-wrap gap-2">
+        <div class="ml-auto flex gap-2">
           <button id="btnSave" class="px-3 py-2 rounded-lg bg-gray-900 text-white">Save</button>
           <button id="btnHealth" class="px-3 py-2 rounded-lg border">Check /healthz</button>
-          <button id="btnShare" class="px-3 py-2 rounded-lg border">Copy share URL</button>
-          <button id="btnShareHash" class="px-3 py-2 rounded-lg border">Copy share URL (hash)</button>
         </div>
       </div>
       <p id="healthOut" class="text-xs text-gray-600 mt-2"></p>
     </section>
 
-    <!-- Case input -->
+    <!-- Case input + Human-in-the-loop chooser -->
     <section class="bg-white shadow-sm rounded-xl p-4 sm:p-5 mb-6 border">
-      <h2 class="font-semibold mb-3">Case Text</h2>
-      <textarea id="caseText" rows="5" class="w-full rounded-lg border px-3 py-2" placeholder="Describe the case in natural SG English…"></textarea>
-      <div class="mt-3 flex gap-2">
-        <button id="btnPredict" class="px-3 py-2 rounded-lg bg-blue-600 text-white">Predict</button>
-        <button id="btnClear" class="px-3 py-2 rounded-lg border">Clear</button>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+        <!-- Left: case text -->
+        <div>
+          <h2 class="font-semibold mb-3">Case Text</h2>
+          <textarea id="caseText" rows="7" class="w-full rounded-lg border px-3 py-2" placeholder="Describe the case in natural SG English…"></textarea>
+          <div class="mt-3 flex gap-2">
+            <button id="btnPredict" class="btn-primary">Predict</button>
+            <button id="btnClear" class="btn">Clear</button>
+          </div>
+          <p id="errMsg" class="text-sm text-red-600 mt-2 hidden"></p>
+        </div>
+
+        <!-- Right: label chooser -->
+        <div>
+          <div class="flex items-center justify-between">
+            <h2 class="font-semibold mb-3">Label Chooser (Search)</h2>
+            <span id="labelsStatus" class="text-xs text-gray-500"></span>
+          </div>
+          <input id="labelSearch" class="w-full rounded-lg border px-3 py-2" placeholder="Search labels or children… (type at least 2 chars)" />
+          <div id="labelsList" class="scroll-pane border rounded-lg mt-2 divide-y bg-gray-50"></div>
+          <p class="text-xs text-gray-500 mt-2">Results load from <span class="mono">/labels</span>; click <em>Add</em> to include into ground-truth.</p>
+        </div>
       </div>
-      <p id="errMsg" class="text-sm text-red-600 mt-2 hidden"></p>
     </section>
 
     <!-- Results & Truth -->
     <section class="bg-white shadow-sm rounded-xl p-4 sm:p-5 mb-6 border">
       <div class="flex items-center justify-between mb-2">
-        <h2 class="font-semibold">Results</h2>
-        <div class="text-sm text-gray-600">Mark <span class="font-medium">Correct?</span> to compute P/R/F1; add any missing labels below.</div>
+        <h2 class="font-semibold">Predictions</h2>
+        <div class="text-sm text-gray-600">Tick <span class="font-medium">Correct?</span> for labels that match. Add missing labels on the right via the chooser.</div>
       </div>
       <div id="topCats" class="text-sm text-gray-700 mb-2"></div>
       <div class="overflow-x-auto">
@@ -108,23 +132,28 @@
 
       <div class="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
         <label class="block">
-          <span class="text-sm">Add missing ground-truth label (slug)</span>
+          <span class="text-sm">Add ground-truth by slug (optional)</span>
           <input id="addTruth" class="mt-1 w-full rounded-lg border px-3 py-2 mono" placeholder="e.g. utilities_comms/electricity_spgroup" />
         </label>
-        <button id="btnAddTruth" class="self-end px-3 py-2 rounded-lg border">Add</button>
-        <div class="self-end text-sm text-gray-600">Ground truth set is “checked predictions” + “added labels”.</div>
+        <button id="btnAddTruth" class="self-end btn">Add</button>
+        <div class="self-end text-sm text-gray-600">
+          Ground-truth is “checked predictions” + “added labels” (chooser or slug box).
+        </div>
       </div>
 
       <div class="mt-4 flex flex-wrap items-center gap-3 text-sm">
         <span id="metricPRF" class="px-2 py-1 rounded bg-gray-100 border"></span>
-        <button id="btnExportCSV" class="px-3 py-2 rounded-lg border">Export feedback row (CSV)</button>
+        <button id="btnExportCSV" class="btn">Export feedback row (CSV)</button>
       </div>
     </section>
 
     <!-- Letter generation -->
     <section class="bg-white shadow-sm rounded-xl p-4 sm:p-5 mb-6 border">
       <h2 class="font-semibold mb-3">Generate Letters</h2>
-      <p class="text-sm text-gray-600 mb-3">Fill contact fields once. Letters are generated per selected label (checked as Correct?). You can edit templates inline before download.</p>
+      <p class="text-sm text-gray-600 mb-3">
+        Letters generate <em>per selected label</em> (those ticked as Correct?).
+        You can edit each letter and then Approve or Reject with a reason.
+      </p>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <label class="block"><span class="text-sm">Citizen Full Name</span><input id="fName" class="mt-1 w-full rounded-lg border px-3 py-2" /></label>
         <label class="block"><span class="text-sm">NRIC/FIN</span><input id="fNRIC" class="mt-1 w-full rounded-lg border px-3 py-2" /></label>
@@ -137,33 +166,70 @@
         <span class="text-sm">PDPA-safe mode (omit personal details in letters)</span>
       </label>
       <div class="mt-3 flex gap-2">
-        <button id="btnGenLetters" class="px-3 py-2 rounded-lg bg-emerald-600 text-white">Generate Letters</button>
-        <button id="btnCopyAll" class="px-3 py-2 rounded-lg border">Copy all</button>
+        <button id="btnGenLetters" class="btn-green">Generate Letters</button>
+        <button id="btnCopyAll" class="btn">Copy all</button>
       </div>
       <div id="lettersWrap" class="mt-4 space-y-6"></div>
     </section>
 
     <footer class="text-xs text-gray-500 pb-8">
-      v0.2 — Client-side tester. Templates are generic; adapt before real use. No server-side storage.
+      v0.4 — Single-file tester. No server-side storage. Uses permanent Cloudflare API. Do not paste PII on public links.
     </footer>
   </div>
 
 <script>
-// ---------- Helpers ----------
-const qs = id => document.getElementById(id);
-const state = { preds: null, truthAdd: new Set(), checked: new Set() };
+/** ---------- Tiny helpers ---------- */
+const qs = (id) => document.getElementById(id);
+const $ = (sel, el=document) => el.querySelector(sel);
+const $$ = (sel, el=document) => Array.from(el.querySelectorAll(sel));
 
-const DEFAULTS = {
-  apiBase: localStorage.getItem('wv.apiBase') || 'http://localhost:8000',
-  apiKey: localStorage.getItem('wv.apiKey') || 'mps-85-whampoa',
-  thresholdTop: parseFloat(localStorage.getItem('wv.thTop') || '0.30'),
-  thresholdChild: parseFloat(localStorage.getItem('wv.thChild') || '0.36'),
-  topKTop: parseInt(localStorage.getItem('wv.kTop') || '6'),
-  topKChild: parseInt(localStorage.getItem('wv.kChild') || '6'),
-  topKTotal: parseInt(localStorage.getItem('wv.kTotal') || '18'),
-  seedPrior: parseFloat(localStorage.getItem('wv.seedPrior') || '0.45'),
-  usePriors: (localStorage.getItem('wv.usePriors') || 'true') === 'true'
+const state = {
+  preds: null,
+  truthAdd: new Set(),
+  checked: new Set(),
+  labels: [],           // all label slugs from /labels
+  labelsLoaded: false,
+  rejections: {},       // {label: reason}
+  approvals: {},        // {label: true}
 };
+
+function parseBool(v, dflt=false) {
+  if (v === undefined || v === null || v === '') return dflt;
+  const s = String(v).toLowerCase();
+  return ['1','true','yes','y','on'].includes(s);
+}
+function parseNum(v, dflt) {
+  const n = Number(v); return Number.isFinite(n) ? n : dflt;
+}
+const qp = new URL(location.href).searchParams;
+
+/** ---------- Defaults (baked-in) ---------- */
+const BASE_DEFAULTS = {
+  apiBase: 'https://api.mpsconnect.thegeekybeng.com', // permanent HTTPS API (Cloudflare)
+  apiKey: 'mps-85-whampoa',                           // test key for beta
+  thresholdTop: 0.28,
+  thresholdChild: 0.34,
+  topKTop: 6,
+  topKChild: 6,
+  topKTotal: 20,
+  seedPrior: 0.44,
+  usePriors: true
+};
+
+// Load order: URL params > localStorage > BASE_DEFAULTS
+const DEFAULTS = {
+  apiBase: qp.get('api') || localStorage.getItem('wv.apiBase') || BASE_DEFAULTS.apiBase,
+  apiKey:  qp.get('key') || localStorage.getItem('wv.apiKey')  || BASE_DEFAULTS.apiKey,
+  thresholdTop: parseNum(qp.get('thTop'),   parseFloat(localStorage.getItem('wv.thTop')   ?? BASE_DEFAULTS.thresholdTop)),
+  thresholdChild: parseNum(qp.get('thChild'), parseFloat(localStorage.getItem('wv.thChild') ?? BASE_DEFAULTS.thresholdChild)),
+  topKTop: parseNum(qp.get('kTop'),   parseInt(localStorage.getItem('wv.kTop')   ?? BASE_DEFAULTS.topKTop)),
+  topKChild: parseNum(qp.get('kChild'), parseInt(localStorage.getItem('wv.kChild') ?? BASE_DEFAULTS.topKChild)),
+  topKTotal: parseNum(qp.get('kTotal'), parseInt(localStorage.getItem('wv.kTotal') ?? BASE_DEFAULTS.topKTotal)),
+  seedPrior: parseNum(qp.get('seed'),  parseFloat(localStorage.getItem('wv.seedPrior') ?? BASE_DEFAULTS.seedPrior)),
+  usePriors: qp.has('priors') ? parseBool(qp.get('priors')) : ((localStorage.getItem('wv.usePriors') ?? '') === '' ? BASE_DEFAULTS.usePriors : (localStorage.getItem('wv.usePriors') === 'true'))
+};
+
+if ([...qp.keys()].length) qs('urlNotice').classList.remove('hidden');
 
 function initForm() {
   qs('apiBase').value = DEFAULTS.apiBase;
@@ -189,108 +255,119 @@ function saveSettings() {
   localStorage.setItem('wv.usePriors', qs('usePriors').checked);
 }
 
-// ---------- URL param wiring ----------
-function readQuery() { return new URLSearchParams(window.location.search); }
-function boolFrom(v, def=false) {
-  if (v === null || v === undefined) return def;
-  return v === '1' || v === 'true';
+/** ---------- API helpers with auto-normalization and /api fallback ---------- */
+function getApiBase() {
+  const raw = (qs('apiBase').value || '').trim();
+  // strip accidental /healthz, /predict, /labels, /api, trailing slash
+  return raw.replace(/\/(healthz|predict|labels|api)(\/)?$/i, '').replace(/\/$/, '');
 }
-function numFrom(v, def) {
-  if (v === null || v === undefined || v === '') return def;
-  const n = Number(v);
-  return Number.isFinite(n) ? n : def;
-}
-// Optional Base64 JSON in hash: #cfg=<b64>
-function readHashCfg() {
-  const m = location.hash.match(/[#&]cfg=([^&]+)/);
-  if (!m) return {};
-  try { return JSON.parse(atob(m[1])); } catch { return {}; }
-}
-function queryOverrides() {
-  const q = readQuery();
-  const h = readHashCfg();
-  const get = (k) => (h[k] !== undefined ? String(h[k]) : (q.get(k) ?? null));
-  return {
-    api:         get('api'),
-    key:         get('key'),
-    thTop:       get('thTop'),
-    thChild:     get('thChild'),
-    kTop:        get('kTop'),
-    kChild:      get('kChild'),
-    kTotal:      get('kTotal'),
-    seedPrior:   get('seedPrior'),
-    priors:      get('priors'),
-    pdpa:        get('pdpa'),
-    text:        get('text'),
-    autopredict: get('autopredict'),
+async function apiFetch(path, opts) {
+  const base = getApiBase();
+  const key = qs('apiKey').value.trim();
+  const headers = {
+    'Content-Type': 'application/json',
+    ...(key ? {'X-API-Key': key} : {})
   };
-}
-function applyQueryOverridesToUI() {
-  const ov = queryOverrides();
-  if (ov.api)        qs('apiBase').value = ov.api;
-  if (ov.key)        qs('apiKey').value = ov.key;
+  const doFetch = (p) => fetch(base + p, {...opts, headers});
 
-  if (ov.thTop)      qs('thresholdTop').value   = numFrom(ov.thTop,   Number(qs('thresholdTop').value));
-  if (ov.thChild)    qs('thresholdChild').value = numFrom(ov.thChild, Number(qs('thresholdChild').value));
-  if (ov.kTop)       qs('topKTop').value        = parseInt(ov.kTop);
-  if (ov.kChild)     qs('topKChild').value      = parseInt(ov.kChild);
-  if (ov.kTotal)     qs('topKTotal').value      = parseInt(ov.kTotal);
-  if (ov.seedPrior)  qs('seedPrior').value      = numFrom(ov.seedPrior, Number(qs('seedPrior').value));
-  if (ov.priors !== null) qs('usePriors').checked = boolFrom(ov.priors, qs('usePriors').checked);
-  if (ov.pdpa  !== null)  qs('pdpaSafe').checked  = boolFrom(ov.pdpa,  qs('pdpaSafe').checked);
-  if (ov.text)       qs('caseText').value = ov.text;
-}
-
-// Build shareable URLs
-function buildShareUrl({useHash=false} = {}) {
-  const cfg = {
-    api: qs('apiBase').value.trim(),
-    key: qs('apiKey').value.trim(),
-    thTop: qs('thresholdTop').value,
-    thChild: qs('thresholdChild').value,
-    kTop: qs('topKTop').value,
-    kChild: qs('topKChild').value,
-    kTotal: qs('topKTotal').value,
-    seedPrior: qs('seedPrior').value,
-    priors: qs('usePriors').checked ? '1' : '0',
-    pdpa: qs('pdpaSafe').checked ? '1' : '0',
-    text: qs('caseText').value.trim(),
-  };
-  const base = location.origin + location.pathname;
-  if (useHash) {
-    const b64 = btoa(JSON.stringify(cfg));
-    return `${base}#cfg=${b64}`;
-  } else {
-    const p = new URLSearchParams(cfg);
-    return `${base}?${p.toString()}`;
+  let r = await doFetch(path);                 // try /healthz, /predict, /labels
+  if (r.status === 404 && !path.startsWith('/api/')) {
+    r = await doFetch('/api' + path);          // fallback to /api/*
   }
+  if (r.status === 401) throw new Error('401 Unauthorized – check X-API-Key');
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  return r.json();
 }
-async function copy(text) { try { await navigator.clipboard.writeText(text); } catch (_) {} }
 
-// ---------- API calls ----------
+/** ---------- Healthz ---------- */
 async function healthz() {
   qs('healthOut').textContent = 'Checking…';
   try {
-    const r = await fetch(qs('apiBase').value.replace(/\/$/, '') + '/healthz', {
-      headers: {
-        ...(qs('apiKey').value.trim() ? {'X-API-Key': qs('apiKey').value.trim()} : {})
-      }
-    });
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    const j = await r.json();
+    const j = await apiFetch('/healthz', { method: 'GET' });
     qs('healthOut').textContent = `OK — labels: ${j.labels}, tops: ${j.tops}`;
   } catch (e) {
     qs('healthOut').textContent = 'Failed: ' + (e?.message || e);
   }
 }
 
+/** ---------- Labels (chooser) ---------- */
+async function loadLabelsOnce() {
+  if (state.labelsLoaded) return;
+  const status = qs('labelsStatus');
+  status.textContent = 'Loading…';
+  try {
+    const j = await apiFetch('/labels', { method: 'GET' });
+    const arr = Array.isArray(j.labels) ? j.labels : (j.labels?.labels || []);
+    state.labels = arr || [];
+    state.labelsLoaded = true;
+    status.textContent = `${state.labels.length} labels`;
+    renderLabelSearchResults();
+  } catch (e) {
+    status.textContent = 'Failed to load labels';
+  }
+}
+function filterLabels(query) {
+  if (!query || query.length < 2) return [];
+  const q = query.toLowerCase();
+  // match on full slug, top, or child
+  return state.labels.filter(l => {
+    if (!l) return false;
+    const s = String(l).toLowerCase();
+    if (s.includes(q)) return true;
+    const parts = s.split('/');
+    return parts.some(p => p.includes(q));
+  }).slice(0, 200); // cap UI list
+}
+function renderLabelSearchResults() {
+  const q = qs('labelSearch').value.trim();
+  const target = qs('labelsList');
+  target.innerHTML = '';
+  if (q.length < 2) {
+    target.innerHTML = `<div class="px-3 py-2 text-sm text-gray-500">Type at least 2 characters to search…</div>`;
+    return;
+  }
+  const res = filterLabels(q);
+  if (res.length === 0) {
+    target.innerHTML = `<div class="px-3 py-2 text-sm text-gray-500">No matches.</div>`;
+    return;
+  }
+  const frag = document.createDocumentFragment();
+  res.forEach(lab => {
+    const row = document.createElement('div');
+    row.className = 'flex items-center justify-between px-3 py-2 bg-white';
+    row.innerHTML = `
+      <div class="mono text-sm">${lab}</div>
+      <div class="flex items-center gap-2">
+        <button class="btn-ghost" data-act="add" data-lab="${lab}">Add</button>
+      </div>
+    `;
+    row.querySelector('[data-act=add]').addEventListener('click', () => {
+      state.truthAdd.add(lab);
+      updateMetrics();
+      // subtle flash / confirmation
+      row.querySelector('[data-act=add]').textContent = 'Added';
+      setTimeout(() => { row.querySelector('[data-act=add]').textContent = 'Add'; }, 800);
+    });
+    frag.appendChild(row);
+  });
+  target.appendChild(frag);
+}
+
+/** ---------- Predict & render ---------- */
+function renderProvider(p) {
+  if (!p) return '<span class="text-gray-400">—</span>';
+  const name = p.provider || 'Provider';
+  const ch = p.channel ? ` · <a class="text-blue-600 underline" href="${p.channel}" target="_blank" rel="noreferrer">link</a>` : '';
+  return `<span class="font-medium">${name}</span><span class="text-gray-500"> (${p.type || '—'})</span>${ch}`;
+}
+
 function renderPreds(resp) {
   const p = resp?.predictions?.[0];
-  state.preds = p || null; state.checked = new Set(); state.truthAdd = new Set();
+  state.preds = p || null;
+  state.checked = new Set();
+  // do not clear truthAdd (human additions should persist across experiments)
   const topCats = p?.top_categories || [];
-  qs('topCats').innerHTML = topCats.map(tc =>
-    `<span class="badge mr-1">${tc.top} <span class="text-gray-500">${Number(tc.score).toFixed(3)}</span></span>`
-  ).join('');
+  qs('topCats').innerHTML = topCats.map(tc => `<span class="badge mr-1">${tc.top} <span class="text-gray-500">${Number(tc.score).toFixed(3)}</span></span>`).join('');
 
   const tbody = qs('predBody');
   tbody.innerHTML = '';
@@ -318,16 +395,9 @@ function renderPreds(resp) {
   updateMetrics();
 }
 
-function renderProvider(p) {
-  if (!p) return '<span class="text-gray-400">—</span>';
-  const name = p.provider || 'Provider';
-  const ch = p.channel ? ` · <a class="text-blue-600 underline" href="${p.channel}" target="_blank" rel="noreferrer">link</a>` : '';
-  return `<span class="font-medium">${name}</span><span class="text-gray-500"> (${p.type || '—'})</span>${ch}`;
-}
-
 function currentTruthSet() {
-  const truth = new Set([...state.checked, ...state.truthAdd]);
-  return truth;
+  // union of checked predictions + manually added
+  return new Set([...state.checked, ...state.truthAdd]);
 }
 
 function updateMetrics() {
@@ -343,11 +413,13 @@ function updateMetrics() {
   qs('metricPRF').textContent = `TP ${TP} · FP ${FP} · FN ${FN} — P ${(prec*100).toFixed(1)}% · R ${(rec*100).toFixed(1)}% · F1 ${(f1*100).toFixed(1)}%`;
 }
 
+/** ---------- CSV feedback ---------- */
 function addTruth() {
   const v = qs('addTruth').value.trim();
-  if (!v) return; state.truthAdd.add(v); qs('addTruth').value=''; updateMetrics();
+  if (!v) return;
+  state.truthAdd.add(v);
+  qs('addTruth').value=''; updateMetrics();
 }
-
 function exportCSV() {
   const p = state.preds; if (!p) return;
   const row = {
@@ -362,9 +434,8 @@ function exportCSV() {
   const header = Object.keys(row).join(',');
   const data = Object.values(row).map(v => '"' + String(v).replaceAll('"','""') + '"').join(',');
   const csv = header + '\n' + data + '\n';
-  downloadFile('wv_feedback.csv', csv, 'text/csv');
+  downloadFile('mpsconnect_feedback.csv', csv, 'text/csv');
 }
-
 function downloadFile(name, content, mime='text/plain') {
   const blob = new Blob([content], {type: mime});
   const url = URL.createObjectURL(blob);
@@ -372,10 +443,11 @@ function downloadFile(name, content, mime='text/plain') {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+/** ---------- Letters with Approve/Edit/Reject ---------- */
 function letterTemplates(label, provider, fields, caseText) {
   const today = new Date().toISOString().slice(0,10);
   const pdpa = !!fields.pdpa;
-  const ref = 'WV-TEST-' + Math.floor(Math.random()*1e6).toString().padStart(6,'0');
+  const ref = 'MPSC-' + Math.floor(Math.random()*1e6).toString().padStart(6,'0');
   let baseHdr = '';
   let refLine = '';
   if (pdpa) {
@@ -390,18 +462,14 @@ function letterTemplates(label, provider, fields, caseText) {
   const provName = provider?.provider || 'the relevant agency';
 
   const T = {
-    'social_support/comcare_short_mid_term': () => `Date: ${today}\n\n${headerBlock}\n\n${provName}\n\n${sal}\n\nRE: Application for ComCare Short-to-Medium Term Assistance\n\nI am writing to request financial assistance due to prolonged unemployment and arrears. Summary:\n• Employment status: unemployed (≥ 2 years).\n• Outstanding bills: utilities, S&CC, housing.\n• Immediate needs: basic living expenses while I seek employment.\n\n${desc}\n\nI would be grateful for an expedited assessment and guidance on required documents. ${closing}`,
-
-    'employment/career_services_e2i': () => `Date: ${today}\n\n${headerBlock}\n\nNTUC e2i\n\n${sal}\n\nRE: Request for Career Coaching and Job Matching\n\nI seek support for job search, coaching and suitable training pathways. My recent background:\n${desc}\n\nPlease advise the next available appointment and any documents to bring. ${closing}`,
-
-    'utilities_comms/electricity_spgroup': () => `Date: ${today}\n\n${headerBlock}\n\nSP Group\n\n${sal}\n\nRE: Appeal for Payment Arrangement — Electricity Account\n\nI request a payment plan to clear arrears while I stabilise income.\nAccount details (if known): [Account No], [Service Address].\nReason: temporary financial hardship.\n\nProposed arrangement: [e.g., $X per month], with reconnection upon first payment if applicable. ${closing}`,
-
-    'housing/town_council_scc_arrears': () => `Date: ${today}\n\n${headerBlock}\n\nTown Council\n\n${sal}\n\nRE: Appeal / Instalment Plan for S&CC Arrears\n\nI request to restructure outstanding Service & Conservancy Charges due to financial hardship.\nEstate/Block/Unit: [Blk XX, #XX-XX].\n\nI propose to pay by instalments and keep current charges up to date. ${closing}`,
-
-    'housing/hdb_loan_arrears': () => `Date: ${today}\n\n${headerBlock}\n\nHousing & Development Board\n\n${sal}\n\nRE: Request for HDB Loan Arrears Arrangement\n\nI am seeking an instalment plan / deferment while I secure employment.\nFlat address: [Blk/Street/Unit].\nLoan reference: [if known].\n\nBackground:\n${desc}\n\nI will maintain future payments and comply with the agreed schedule. ${closing}`,
+    'social_support/comcare_short_mid_term': () => `Date: ${today}\n\n${headerBlock}\n\n${provName}\n\n${sal}\n\nRE: Application for ComCare Short-to-Medium Term Assistance\n\nI am writing to request financial assistance due to prolonged unemployment and arrears. Summary:\n• Prolonged unemployment.\n• Outstanding bills: utilities, S&CC, housing.\n• Immediate needs: basic expenses while seeking employment.\n\n${desc}\n\nI would be grateful for an expedited assessment and guidance on required documents.${closing}`,
+    'employment/career_services_e2i': () => `Date: ${today}\n\n${headerBlock}\n\nNTUC e2i\n\n${sal}\n\nRE: Request for Career Coaching and Job Matching\n\nI seek support for job search, coaching and suitable training pathways.\n\nBackground:\n${desc}\n\nPlease advise the next appointment and documents to bring.${closing}`,
+    'utilities_comms/electricity_spgroup': () => `Date: ${today}\n\n${headerBlock}\n\nSP Group\n\n${sal}\n\nRE: Appeal for Payment Arrangement — Electricity Account\n\nI request a payment plan to clear arrears during temporary financial hardship.\nAccount: [No], Service Address: [Address].\nProposed arrangement: [e.g., $X per month].${closing}`,
+    'housing/town_council_scc_arrears': () => `Date: ${today}\n\n${headerBlock}\n\nTown Council\n\n${sal}\n\nRE: Appeal / Instalment Plan for S&CC Arrears\n\nI request to restructure outstanding Service & Conservancy Charges due to financial hardship.\nEstate/Block/Unit: [Blk XX, #XX-XX].${closing}`,
+    'housing/hdb_loan_arrears': () => `Date: ${today}\n\n${headerBlock}\n\nHousing & Development Board\n\n${sal}\n\nRE: HDB Loan Arrears — Instalment/Deferment Request\n\nI am seeking an instalment plan / deferment while I secure employment.\nFlat address: [Blk/Street/Unit]. Loan ref: [if known].\n\nBackground:\n${desc}\n\nI will maintain future payments under the agreed schedule.${closing}`,
   };
   const f = T[label];
-  return (f ? f() : `Date: ${today}\n\n${headerBlock}\n\n${provName}\n\n${sal}\n\nRE: Assistance Request\n\n${desc}\n\nI appreciate your consideration. ${closing}`);
+  return (f ? f() : `Date: ${today}\n\n${headerBlock}\n\n${provName}\n\n${sal}\n\nRE: Assistance Request\n\n${desc}\n\nThank you for your consideration.${closing}`);
 }
 
 function generateLetters() {
@@ -422,33 +490,72 @@ function generateLetters() {
     const prov = providers[lab] || {};
     const body = letterTemplates(lab, prov, fields, caseText);
     const el = document.createElement('div');
-    el.className = 'border rounded-lg p-3';
+    el.className = 'border rounded-lg p-3 bg-white';
+    const rid = 'rej_' + Math.random().toString(36).slice(2);
     el.innerHTML = `
       <div class="flex items-center justify-between mb-2">
         <div>
           <div class="text-sm text-gray-500">Label</div>
           <div class="font-medium mono">${lab}</div>
-          <div class="text-sm text-gray-600">${prov.provider ? 'Provider: ' + prov.provider : ''}</div>
+          <div class="text-xs text-gray-500">${prov.provider ? 'Provider: ' + prov.provider : ''}</div>
         </div>
         <div class="flex gap-2">
-          <button class="px-2 py-1 text-sm rounded border" data-act="copy">Copy</button>
-          <button class="px-2 py-1 text-sm rounded border" data-act="download">Download .txt</button>
+          <button class="btn-green" data-act="approve">Approve</button>
+          <button class="btn-amber" data-act="edit">Edit</button>
+          <button class="btn-red" data-act="reject">Reject</button>
         </div>
       </div>
-      <textarea class="w-full rounded-lg border px-3 py-2 mono" rows="12">${body.replaceAll('<','&lt;')}</textarea>
+      <textarea class="w-full rounded-lg border px-3 py-2 mono" rows="12" data-role="letter">${body.replaceAll('<','&lt;')}</textarea>
+      <div class="mt-2 hidden" data-role="reject-box">
+        <label class="block text-sm text-gray-600 mb-1">Rejection reason / suggested label change</label>
+        <input id="${rid}" class="w-full rounded-lg border px-3 py-2" placeholder="Explain why this letter/label is rejected and what should be used instead…" />
+      </div>
+      <div class="mt-2 flex gap-2">
+        <button class="btn-ghost" data-act="copy">Copy</button>
+        <button class="btn-ghost" data-act="download">Download .txt</button>
+      </div>
     `;
+    const ta = el.querySelector('[data-role=letter]');
+    const rejBox = el.querySelector('[data-role=reject-box]');
     el.querySelector('[data-act=copy]').addEventListener('click', async () => {
-      const text = el.querySelector('textarea').value; await navigator.clipboard.writeText(text);
+      const text = ta.value; await navigator.clipboard.writeText(text);
     });
     el.querySelector('[data-act=download]').addEventListener('click', () => {
-      const text = el.querySelector('textarea').value;
+      const text = ta.value;
       const fname = lab.replaceAll('/','_') + '.txt';
       downloadFile(fname, text, 'text/plain');
+    });
+    el.querySelector('[data-act=approve]').addEventListener('click', () => {
+      state.approvals[lab] = true;
+      delete state.rejections[lab];
+      rejBox.classList.add('hidden');
+      el.classList.remove('bg-red-50');
+      el.classList.add('bg-green-50');
+    });
+    el.querySelector('[data-act=edit]').addEventListener('click', () => {
+      ta.focus();
+    });
+    el.querySelector('[data-act=reject]').addEventListener('click', () => {
+      const input = document.getElementById(rid);
+      rejBox.classList.remove('hidden');
+      el.classList.remove('bg-green-50');
+      el.classList.add('bg-red-50');
+      setTimeout(() => input?.focus(), 0);
+      input?.addEventListener('input', () => {
+        state.rejections[lab] = input.value.trim();
+        if (!state.rejections[lab]) delete state.rejections[lab];
+      });
     });
     wrap.appendChild(el);
   });
 }
 
+function copyAllLetters() {
+  const texts = [...document.querySelectorAll('#lettersWrap textarea[data-role=letter]')].map(t => t.value).join('\n\n---\n\n');
+  if (texts) navigator.clipboard.writeText(texts);
+}
+
+/** ---------- Predict action ---------- */
 async function predictOnce() {
   qs('errMsg').classList.add('hidden');
   saveSettings();
@@ -465,14 +572,7 @@ async function predictOnce() {
   };
   if (!payload.texts[0]) { qs('errMsg').textContent = 'Enter case text.'; qs('errMsg').classList.remove('hidden'); return; }
   try {
-    const r = await fetch(qs('apiBase').value.replace(/\/$/, '') + '/predict', {
-      method: 'POST', headers: {
-        'Content-Type': 'application/json',
-        ...(qs('apiKey').value.trim() ? {'X-API-Key': qs('apiKey').value.trim()} : {})
-      }, body: JSON.stringify(payload)
-    });
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    const j = await r.json();
+    const j = await apiFetch('/predict', { method: 'POST', body: JSON.stringify(payload) });
     renderPreds(j);
   } catch (e) {
     qs('errMsg').textContent = 'Predict failed: ' + (e?.message || e);
@@ -480,33 +580,33 @@ async function predictOnce() {
   }
 }
 
-function copyAllLetters() {
-  const texts = [...document.querySelectorAll('#lettersWrap textarea')].map(t => t.value).join('\n\n---\n\n');
-  if (texts) navigator.clipboard.writeText(texts);
-}
-
-// ---------- Wire up ----------
+/** ---------- Wire up ---------- */
 initForm();
-applyQueryOverridesToUI();
 qs('btnSave').addEventListener('click', saveSettings);
 qs('btnHealth').addEventListener('click', healthz);
 qs('btnPredict').addEventListener('click', predictOnce);
 qs('btnClear').addEventListener('click', () => {
-  qs('caseText').value=''; qs('predBody').innerHTML=''; qs('topCats').innerHTML='';
-  state.preds=null; state.checked.clear(); state.truthAdd.clear(); updateMetrics(); qs('lettersWrap').innerHTML='';
+  qs('caseText').value='';
+  qs('predBody').innerHTML='';
+  qs('topCats').innerHTML='';
+  state.preds=null; state.checked.clear();
+  // keep truthAdd (human ground-truth additions) unless you want to clear:
+  // state.truthAdd.clear();
+  updateMetrics();
+  qs('lettersWrap').innerHTML='';
 });
 qs('btnAddTruth').addEventListener('click', addTruth);
 qs('btnExportCSV').addEventListener('click', exportCSV);
 qs('btnGenLetters').addEventListener('click', generateLetters);
 qs('btnCopyAll').addEventListener('click', copyAllLetters);
-qs('btnShare').addEventListener('click', async () => { const url = buildShareUrl({useHash:false}); await copy(url); alert('Share URL copied to clipboard.'); });
-qs('btnShareHash').addEventListener('click', async () => { const url = buildShareUrl({useHash:true}); await copy(url); alert('Share URL (hash) copied to clipboard.'); });
 
-// Auto actions from URL
-const ov = queryOverrides();
-if (ov.autopredict && boolFrom(ov.autopredict, false)) {
-  setTimeout(predictOnce, 200);
-}
+// Chooser
+qs('labelSearch').addEventListener('input', renderLabelSearchResults);
+qs('labelSearch').addEventListener('focus', loadLabelsOnce);
+document.addEventListener('DOMContentLoaded', () => { loadLabelsOnce().catch(()=>{}); });
+
+// If ?api= is present, auto-run a quick health check
+if (qp.get('api')) { setTimeout(healthz, 200); }
 </script>
 </body>
 </html>
