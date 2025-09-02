@@ -18,12 +18,19 @@ MODEL_DIR = os.environ.get("MODEL_DIR", "/app/artifacts_zs_hier_plus")
 PROVIDERS_JSON = os.environ.get("PROVIDERS_JSON", "/app/providers_map.json")
 
 # ------------------ APP ---------------------
-app = FastAPI(title="WhiteVision Hier ZS API", version="1.3")
+app = FastAPI()
+
+ALLOWED_ORIGINS = [
+    "https://thegeekybeng.github.io",
+    "https://thegeekybeng.github.io/mps-connect_testers",  # if you serve under a subpath
+    "https://api.mpsconnect.thegeekybeng.com",  # optional: allows testing healthz in browser
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # beta testing; lock down later
-    allow_credentials=True,
-    allow_methods=["*"],
+    allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=False,  # keep False; you don't send cookies/auth
+    allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
 
