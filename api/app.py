@@ -15,11 +15,12 @@ from sklearn.preprocessing import normalize  # type: ignore[import]
 
 # Configure logging to fix Railway Level: error issue
 import sys
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     stream=sys.stdout,
-    force=True
+    force=True,
 )
 logger = logging.getLogger(__name__)
 
@@ -184,38 +185,42 @@ def _fit_projection(label_tfidf, label_emb_unit):
 # 2) In startup: populate app.state instead of globals
 @app.on_event("startup")
 def _startup():
-    logger.info("Starting MPS Connect API...")
-    logger.info(f"Loading artifacts from: {MODEL_DIR}")
+    try:
+        logger.info("Starting MPS Connect API...")
+        logger.info(f"Loading artifacts from: {MODEL_DIR}")
 
-    labels, tops, label_emb, meta = load_artifacts(MODEL_DIR)
-    logger.info(f"Loaded {len(labels)} labels and {len(tops)} top categories")
+        labels, tops, label_emb, meta = load_artifacts(MODEL_DIR)
+        logger.info(f"Loaded {len(labels)} labels and {len(tops)} top categories")
 
-    label_emb_unit = _normalize_rows(label_emb.astype(np.float32))
-    vect = TfidfVectorizer(min_df=1, max_df=1.0, ngram_range=(1, 2))
-    label_tfidf = vect.fit_transform(labels)
-    label_tfidf_unit = _normalize_tfidf(label_tfidf)
-    w_cache = _fit_projection(label_tfidf, label_emb_unit)
-    vs = VectorSpace(
-        vect=vect,
-        label_tfidf=label_tfidf,
-        label_tfidf_unit=label_tfidf_unit,
-        w_cache=w_cache,
-    )
+        label_emb_unit = _normalize_rows(label_emb.astype(np.float32))
+        vect = TfidfVectorizer(min_df=1, max_df=1.0, ngram_range=(1, 2))
+        label_tfidf = vect.fit_transform(labels)
+        label_tfidf_unit = _normalize_tfidf(label_tfidf)
+        w_cache = _fit_projection(label_tfidf, label_emb_unit)
+        vs = VectorSpace(
+            vect=vect,
+            label_tfidf=label_tfidf,
+            label_tfidf_unit=label_tfidf_unit,
+            w_cache=w_cache,
+        )
 
-    providers = load_providers_map(PROVIDERS_JSON)
-    logger.info(f"Loaded {len(providers)} provider mappings")
+        providers = load_providers_map(PROVIDERS_JSON)
+        logger.info(f"Loaded {len(providers)} provider mappings")
 
-    app.state.ms = ModelState(
-        labels=labels,
-        tops=tops,
-        label_emb=label_emb,
-        label_emb_unit=label_emb_unit,
-        providers=providers,
-        meta=meta,
-        vs=vs,
-    )
+        app.state.ms = ModelState(
+            labels=labels,
+            tops=tops,
+            label_emb=label_emb,
+            label_emb_unit=label_emb_unit,
+            providers=providers,
+            meta=meta,
+            vs=vs,
+        )
 
-    logger.info("MPS Connect API startup complete")
+        logger.info("MPS Connect API startup complete")
+    except Exception as e:
+        logger.error(f"Startup failed: {e}")
+        raise
 
 
 # 3) Replace global uses with app.state.ms (example in helpers)
@@ -403,10 +408,10 @@ if __name__ == "__main__":
     import uvicorn
 
     uvicorn.run(
-        "app:app", 
-        host="0.0.0.0", 
-        port=8000, 
+        "app:app",
+        host="0.0.0.0",
+        port=8000,
         reload=False,
         log_level="info",
-        access_log=True
+        access_log=True,
     )
