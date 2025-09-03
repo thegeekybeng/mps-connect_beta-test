@@ -13,7 +13,7 @@ from pydantic import BaseModel
 from sklearn.feature_extraction.text import TfidfVectorizer  # type: ignore[import]
 from sklearn.preprocessing import normalize  # type: ignore[import]
 
-# Configure logging to fix Railway Level: error issue
+# Configure logging
 import sys
 
 logging.basicConfig(
