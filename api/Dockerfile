@@ -13,7 +13,7 @@ COPY artifacts_zs_hier_plus /app/artifacts_zs_hier_plus
 COPY providers_map.json /app/providers_map.json
 
 # Copy SSL certs
-# COPY certs /app/certs
+COPY certs /app/certs
 
 EXPOSE 8000
 

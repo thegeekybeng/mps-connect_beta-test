@@ -17,8 +17,8 @@ services:
       uvicorn app:app
       --host 0.0.0.0
       --port 8000
-     #  --ssl-certfile /app/certs/origin.pem
-     # --ssl-keyfile /app/certs/origin.key
+      --ssl-certfile /app/certs/origin.pem
+      --ssl-keyfile /app/certs/origin.key
     ports:
       - "8000:8000"
     restart: unless-stopped

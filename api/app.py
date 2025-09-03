@@ -22,8 +22,11 @@ app = FastAPI()
 
 ALLOWED_ORIGINS = [
     "https://thegeekybeng.github.io",
-    "https://thegeekybeng.github.io/mps-connect_testers",  # if you serve under a subpath
-    "https://api.mpsconnect.thegeekybeng.com",  # optional: allows testing healthz in browser
+    "https://thegeekybeng.github.io/mps-connect_testers",  # github repo url
+    "https://thegeekybeng.github.io/mps-connect_beta-test/",  # actual github page url
+    "https://api.mpsconnect.thegeekybeng.com",  # api url
+    "http://localhost:8080",  # For local development
+    "http://localhost:3000",  # Alternative local port
 ]
 
 app.add_middleware(

@@ -9,12 +9,12 @@
     .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
     .badge { padding: 0.125rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem; background-color: rgb(243 244 246); border: 1px solid rgb(229 231 235); }
     .scroll-pane { max-height: 18rem; overflow: auto; }
-    .btn { @apply px-3 py-2 rounded-lg border; }
-    .btn-primary { @apply px-3 py-2 rounded-lg bg-blue-600 text-white; }
-    .btn-ghost { @apply px-2 py-1 text-sm rounded border; }
-    .btn-green { @apply px-2 py-1 text-sm rounded bg-emerald-600 text-white; }
-    .btn-red { @apply px-2 py-1 text-sm rounded bg-red-600 text-white; }
-    .btn-amber { @apply px-2 py-1 text-sm rounded bg-amber-500 text-white; }
+    .btn { padding: 0.5rem 0.75rem; border-radius: 0.5rem; border: 1px solid #d1d5db; }
+    .btn-primary { padding: 0.5rem 0.75rem; border-radius: 0.5rem; background-color: #2563eb; color: white; }
+    .btn-ghost { padding: 0.25rem 0.5rem; font-size: 0.875rem; border-radius: 0.25rem; border: 1px solid #d1d5db; }
+    .btn-green { padding: 0.25rem 0.5rem; font-size: 0.875rem; border-radius: 0.25rem; background-color: #059669; color: white; }
+    .btn-red { padding: 0.25rem 0.5rem; font-size: 0.875rem; border-radius: 0.25rem; background-color: #dc2626; color: white; }
+    .btn-amber { padding: 0.25rem 0.5rem; font-size: 0.875rem; border-radius: 0.25rem; background-color: #f59e0b; color: white; }
   </style>
 </head>
 <body class="bg-gray-50 text-gray-900">
@@ -205,7 +205,7 @@ const qp = new URL(location.href).searchParams;
 
 /** ---------- Defaults (baked-in) ---------- */
 const BASE_DEFAULTS = {
-  apiBase: 'https://mpsconnect.thegeekybeng.com', // permanent HTTPS API (Cloudflare)
+  apiBase: 'https://mps-connectbeta-test-production.up.railway.app', // Railway deployment
   apiKey: 'mps-85-whampoa',                           // test key for beta
   thresholdTop: 0.28,
   thresholdChild: 0.34,
