@@ -261,18 +261,21 @@ function getApiBase() {
   // strip accidental /healthz, /predict, /labels, /api, trailing slash
   return raw.replace(/\/(healthz|predict|labels|api)(\/)?$/i, '').replace(/\/$/, '');
 }
-async function apiFetch(path, opts) {
+async function apiFetch(path, opts = {}) {
   const base = getApiBase();
   const key = qs('apiKey').value.trim();
-  const headers = {
-    'Content-Type': 'application/json',
-    ...(key ? {'X-API-Key': key} : {})
-  };
-  const doFetch = (p) => fetch(base + p, {...opts, headers});
+  const method = (opts.method || 'GET').toUpperCase();
 
-  let r = await doFetch(path);                 // try /healthz, /predict, /labels
+  const headers = {
+    ...(method !== 'GET' ? { 'Content-Type': 'application/json' } : {}),
+    ...(key ? { 'X-API-Key': key } : {})
+  };
+
+  const doFetch = (p) => fetch(base + p, { ...opts, method, headers, mode: 'cors', credentials: 'omit' });
+
+  let r = await doFetch(path);
   if (r.status === 404 && !path.startsWith('/api/')) {
-    r = await doFetch('/api' + path);          // fallback to /api/*
+    r = await doFetch('/api' + path);
   }
   if (r.status === 401) throw new Error('401 Unauthorized – check X-API-Key');
   if (!r.ok) throw new Error('HTTP ' + r.status);
