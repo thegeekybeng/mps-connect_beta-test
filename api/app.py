@@ -86,7 +86,7 @@ def load_artifacts(
 
     labels = artifacts.get("labels") or artifacts.get("label_list")
     if not labels or len(labels) != label_embeds.shape[0]:
-        raise RuntimeError("Labels list missing or length mismatch with embeddings")
+        raise RuntimeError(f"Labels list missing or length mismatch with embeddings: labels={len(labels) if labels else 0}, embeddings={label_embeds.shape[0]}, file={emb_path}")
 
     tops = artifacts.get("tops") or artifacts.get("top_categories") or []
     meta = {
