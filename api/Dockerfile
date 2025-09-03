@@ -1,5 +1,5 @@
 FROM python:3.11-slim
-ARG CACHE_BUST=2
+ARG CACHE_BUST=3
 
 WORKDIR /app
 
@@ -15,7 +15,7 @@ COPY providers_map.json /app/providers_map.json
 
 # Copy SSL certs
 COPY certs /app/certs
-# Force rebuild - updated embeddings
+# Force rebuild - updated embeddings (v3)
 
 EXPOSE 8000
 
