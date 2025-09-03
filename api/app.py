@@ -63,7 +63,7 @@ def load_artifacts(
     emb_path = None
     for cand in (
         "label_emb.npy",
-        "label_embeds.npy", 
+        "label_embeds.npy",
         "label_embeddings.npy",
         "labels_emb.npy",
         "embeddings.npy",
