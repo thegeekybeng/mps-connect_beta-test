@@ -21,6 +21,7 @@ PROVIDERS_JSON = os.environ.get("PROVIDERS_JSON", "/app/providers_map.json")
 app = FastAPI()
 
 ALLOWED_ORIGINS = [
+    "http://mpsconnect.thegeekybeng.com",  # actual url
     "https://thegeekybeng.github.io",
     "https://thegeekybeng.github.io/mps-connect_testers",  # github repo url
     "https://thegeekybeng.github.io/mps-connect_beta-test/",  # actual github page url
@@ -31,9 +32,7 @@ ALLOWED_ORIGINS = [
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://thegeekybeng.github.io",  # GitHub Pages origin
-    ],
+    allow_origins=ALLOWED_ORIGINS,
     allow_methods=["*"],
     allow_headers=["*"],
 )
