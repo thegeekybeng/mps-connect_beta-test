@@ -13,12 +13,21 @@ from pydantic import BaseModel
 from sklearn.feature_extraction.text import TfidfVectorizer  # type: ignore[import]
 from sklearn.preprocessing import normalize  # type: ignore[import]
 
-# Configure logging
+# Configure logging to fix Railway Level: error issue
+import sys
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    stream=sys.stdout,
+    force=True
 )
 logger = logging.getLogger(__name__)
+
+# Fix uvicorn logging
+uvicorn_logger = logging.getLogger("uvicorn")
+uvicorn_logger.setLevel(logging.INFO)
+uvicorn_access_logger = logging.getLogger("uvicorn.access")
+uvicorn_access_logger.setLevel(logging.INFO)
 
 # ------------------ CONFIG ------------------
 API_KEY = "mps-85-whampoa"  # header: X-API-Key
@@ -177,10 +186,10 @@ def _fit_projection(label_tfidf, label_emb_unit):
 def _startup():
     logger.info("Starting MPS Connect API...")
     logger.info(f"Loading artifacts from: {MODEL_DIR}")
-    
+
     labels, tops, label_emb, meta = load_artifacts(MODEL_DIR)
     logger.info(f"Loaded {len(labels)} labels and {len(tops)} top categories")
-    
+
     label_emb_unit = _normalize_rows(label_emb.astype(np.float32))
     vect = TfidfVectorizer(min_df=1, max_df=1.0, ngram_range=(1, 2))
     label_tfidf = vect.fit_transform(labels)
@@ -192,10 +201,10 @@ def _startup():
         label_tfidf_unit=label_tfidf_unit,
         w_cache=w_cache,
     )
-    
+
     providers = load_providers_map(PROVIDERS_JSON)
     logger.info(f"Loaded {len(providers)} provider mappings")
-    
+
     app.state.ms = ModelState(
         labels=labels,
         tops=tops,
@@ -205,7 +214,7 @@ def _startup():
         meta=meta,
         vs=vs,
     )
-    
+
     logger.info("MPS Connect API startup complete")
 
 
@@ -393,4 +402,11 @@ mount_routes("/api")
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=False)
+    uvicorn.run(
+        "app:app", 
+        host="0.0.0.0", 
+        port=8000, 
+        reload=False,
+        log_level="info",
+        access_log=True
+    )
