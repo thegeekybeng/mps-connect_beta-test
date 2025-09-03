@@ -31,9 +31,10 @@ ALLOWED_ORIGINS = [
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,
-    allow_credentials=False,  # keep False; you don't send cookies/auth
-    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_origins=[
+        "https://thegeekybeng.github.io",  # GitHub Pages origin
+    ],
+    allow_methods=["*"],
     allow_headers=["*"],
 )
 
