@@ -59,10 +59,11 @@ def load_artifacts(
     with open(art_json, "r", encoding="utf-8") as f:
         artifacts = json.load(f)
 
-    # embeddings file (first match wins)
+    # embeddings file (prioritize label_emb.npy)
     emb_path = None
     for cand in (
-        "label_embeds.npy",
+        "label_emb.npy",
+        "label_embeds.npy", 
         "label_embeddings.npy",
         "labels_emb.npy",
         "embeddings.npy",
@@ -72,9 +73,9 @@ def load_artifacts(
             emb_path = p
             break
     if emb_path is None:
-        # fallback: any .npy file
+        # fallback: any .npy file except top_emb.npy
         for fname in os.listdir(model_dir):
-            if fname.endswith(".npy"):
+            if fname.endswith(".npy") and fname != "top_emb.npy":
                 emb_path = os.path.join(model_dir, fname)
                 break
     if emb_path is None:
@@ -86,7 +87,9 @@ def load_artifacts(
 
     labels = artifacts.get("labels") or artifacts.get("label_list")
     if not labels or len(labels) != label_embeds.shape[0]:
-        raise RuntimeError(f"Labels list missing or length mismatch with embeddings: labels={len(labels) if labels else 0}, embeddings={label_embeds.shape[0]}, file={emb_path}")
+        raise RuntimeError(
+            f"Labels list missing or length mismatch with embeddings: labels={len(labels) if labels else 0}, embeddings={label_embeds.shape[0]}, file={emb_path}"
+        )
 
     tops = artifacts.get("tops") or artifacts.get("top_categories") or []
     meta = {
