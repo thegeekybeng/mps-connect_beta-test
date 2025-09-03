@@ -2,6 +2,7 @@
 
 import os
 import json
+import logging
 from typing import List, Dict, Any, Optional, Tuple
 from dataclasses import dataclass
 
@@ -11,6 +12,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sklearn.feature_extraction.text import TfidfVectorizer  # type: ignore[import]
 from sklearn.preprocessing import normalize  # type: ignore[import]
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
+logger = logging.getLogger(__name__)
 
 # ------------------ CONFIG ------------------
 API_KEY = "mps-85-whampoa"  # header: X-API-Key
@@ -167,7 +175,12 @@ def _fit_projection(label_tfidf, label_emb_unit):
 # 2) In startup: populate app.state instead of globals
 @app.on_event("startup")
 def _startup():
+    logger.info("Starting MPS Connect API...")
+    logger.info(f"Loading artifacts from: {MODEL_DIR}")
+    
     labels, tops, label_emb, meta = load_artifacts(MODEL_DIR)
+    logger.info(f"Loaded {len(labels)} labels and {len(tops)} top categories")
+    
     label_emb_unit = _normalize_rows(label_emb.astype(np.float32))
     vect = TfidfVectorizer(min_df=1, max_df=1.0, ngram_range=(1, 2))
     label_tfidf = vect.fit_transform(labels)
@@ -179,15 +192,21 @@ def _startup():
         label_tfidf_unit=label_tfidf_unit,
         w_cache=w_cache,
     )
+    
+    providers = load_providers_map(PROVIDERS_JSON)
+    logger.info(f"Loaded {len(providers)} provider mappings")
+    
     app.state.ms = ModelState(
         labels=labels,
         tops=tops,
         label_emb=label_emb,
         label_emb_unit=label_emb_unit,
-        providers=load_providers_map(PROVIDERS_JSON),
+        providers=providers,
         meta=meta,
         vs=vs,
     )
+    
+    logger.info("MPS Connect API startup complete")
 
 
 # 3) Replace global uses with app.state.ms (example in helpers)
