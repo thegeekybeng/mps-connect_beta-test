@@ -1,6 +1,7 @@
 """FastAPI app for hierarchical zero-shot text classification (testers API)."""
 
 import os
+import sys
 import json
 import logging
 from typing import List, Dict, Any, Optional, Tuple
@@ -9,12 +10,12 @@ from dataclasses import dataclass
 import numpy as np
 from fastapi import FastAPI, Depends, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+
+from pydantic import BaseModel  # type: ignore[attr-defined]
 from sklearn.feature_extraction.text import TfidfVectorizer  # type: ignore[import]
 from sklearn.preprocessing import normalize  # type: ignore[import]
 
 # Configure logging
-import sys
 
 logging.basicConfig(
     level=logging.INFO,
@@ -101,15 +102,19 @@ def load_artifacts(
 
     label_embeds = np.load(emb_path)
     if label_embeds.ndim != 2:
-        raise RuntimeError(f"Embeddings shape invalid: {label_embeds.shape}")
+        raise RuntimeError("Embeddings shape invalid: %s", label_embeds.shape)
 
     labels = artifacts.get("labels") or artifacts.get("label_list")
     if not labels or len(labels) != label_embeds.shape[0]:
         raise RuntimeError(
-            f"Labels list missing or length mismatch with embeddings: labels={len(labels) if labels else 0}, embeddings={label_embeds.shape[0]}, file={emb_path}"
+            "Labels list missing or length mismatch with embeddings: "
+            "labels=%d, embeddings=%d, file=%s"
+            % (len(labels) if labels else 0, label_embeds.shape[0], emb_path)
         )
-
-    tops = artifacts.get("tops") or artifacts.get("top_categories") or []
+    # Remove duplicate top categories
+    top_categories = artifacts.get("tops") or artifacts.get("top_categories") or []
+    tops = list(set(top_categories))  # Remove duplicate top categories  (just in case)
+    print(f"Tops: {tops}")  # for debugging
     meta = {
         "embedding_model": artifacts.get("embedding_model"),
         "embeddings_file": os.path.basename(emb_path),
@@ -187,10 +192,10 @@ def _fit_projection(label_tfidf, label_emb_unit):
 def _startup():
     try:
         logger.info("Starting MPS Connect API...")
-        logger.info(f"Loading artifacts from: {MODEL_DIR}")
+        logger.info("Loading artifacts from: %s", MODEL_DIR)
 
         labels, tops, label_emb, meta = load_artifacts(MODEL_DIR)
-        logger.info(f"Loaded {len(labels)} labels and {len(tops)} top categories")
+        logger.info("Loaded %d labels and %d top categories", len(labels), len(tops))
 
         label_emb_unit = _normalize_rows(label_emb.astype(np.float32))
         vect = TfidfVectorizer(min_df=1, max_df=1.0, ngram_range=(1, 2))
@@ -205,7 +210,7 @@ def _startup():
         )
 
         providers = load_providers_map(PROVIDERS_JSON)
-        logger.info(f"Loaded {len(providers)} provider mappings")
+        logger.info("Loaded %d provider mappings", len(providers))
 
         app.state.ms = ModelState(
             labels=labels,
@@ -219,7 +224,7 @@ def _startup():
 
         logger.info("MPS Connect API startup complete")
     except Exception as e:
-        logger.error(f"Startup failed: {e}")
+        logger.error("Startup failed: %s", e)
         raise
 
 
