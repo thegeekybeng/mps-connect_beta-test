@@ -6,7 +6,7 @@ services:
   - type: redis
     name: mps-connect-redis
     plan: starter
-    region: oregon
+    region: singapore
     maxmemoryPolicy: allkeys-lru
     ipAllowList: []
 
@@ -15,7 +15,7 @@ services:
     name: mps-connect-api
     runtime: docker
     plan: starter
-    region: oregon
+    region: singapore
     dockerfilePath: ./Dockerfile
     healthCheckPath: /healthz
     autoDeploy: true
@@ -122,7 +122,7 @@ services:
     name: mps-connect-migrate
     runtime: docker
     plan: starter
-    region: oregon
+    region: singapore
     dockerfilePath: ./Dockerfile.api
     schedule: "0 2 * * *"  # Daily at 2 AM
     buildCommand: echo "Building migration service..."
@@ -138,7 +138,7 @@ services:
     name: mps-connect-backup
     runtime: docker
     plan: starter
-    region: oregon
+    region: singapore
     dockerfilePath: ./Dockerfile.backup
     schedule: "0 3 * * *"  # Daily at 3 AM
     buildCommand: echo "Building backup service..."
@@ -160,7 +160,7 @@ services:
     name: mps-connect-monitor
     runtime: docker
     plan: starter
-    region: oregon
+    region: singapore
     dockerfilePath: ./Dockerfile.monitor
     buildCommand: echo "Building monitoring service..."
     startCommand: python scripts/monitor_services.py
