@@ -8,14 +8,24 @@ from typing import List, Dict, Any, Optional, Tuple
 from dataclasses import dataclass
 
 import numpy as np
+import re
 from fastapi import FastAPI, Depends, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from pydantic import BaseModel  # type: ignore[attr-defined]
+
+# sklearn imports (grouped)
 from sklearn.feature_extraction.text import TfidfVectorizer  # type: ignore[import]
+from sklearn.metrics import pairwise as sk_pairwise  # type: ignore[import]
 from sklearn.preprocessing import normalize  # type: ignore[import]
 
-# Configure logging
+# Optional heavy dependencies imported at module scope (to satisfy linters)
+try:  # noqa: E402
+    import sentence_transformers  # type: ignore[import]
+except ImportError:  # optional dependency
+    sentence_transformers = None  # type: ignore[assignment]
+
+# (sklearn imported above — keep a single alias: sk_pairwise)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -33,8 +43,8 @@ uvicorn_access_logger.setLevel(logging.INFO)
 
 # ------------------ CONFIG ------------------
 API_KEY = "mps-85-whampoa"  # header: X-API-Key
-MODEL_DIR = os.environ.get("MODEL_DIR", "/app/artifacts_zs_hier_plus")
-PROVIDERS_JSON = os.environ.get("PROVIDERS_JSON", "/app/providers_map.json")
+MODEL_DIR = os.environ.get("MODEL_DIR", "./artifacts_zs_hier_plus")
+PROVIDERS_JSON = os.environ.get("PROVIDERS_JSON", "./providers_map.json")
 
 # ------------------ APP ---------------------
 app = FastAPI()
@@ -102,19 +112,21 @@ def load_artifacts(
 
     label_embeds = np.load(emb_path)
     if label_embeds.ndim != 2:
-        raise RuntimeError("Embeddings shape invalid: %s", label_embeds.shape)
+        raise RuntimeError("Embeddings shape invalid: %s" % (label_embeds.shape,))
 
     labels = artifacts.get("labels") or artifacts.get("label_list")
     if not labels or len(labels) != label_embeds.shape[0]:
+        msg = (
+            "Labels list missing or length mismatch with embeddings: labels=%s, "
+            "embeddings=%s, file=%s"
+        )
         raise RuntimeError(
-            "Labels list missing or length mismatch with embeddings: "
-            "labels=%d, embeddings=%d, file=%s"
-            % (len(labels) if labels else 0, label_embeds.shape[0], emb_path)
+            msg % (len(labels) if labels else 0, label_embeds.shape[0], emb_path)
         )
     # Remove duplicate top categories
     top_categories = artifacts.get("tops") or artifacts.get("top_categories") or []
     tops = list(set(top_categories))  # Remove duplicate top categories  (just in case)
-    print(f"Tops: {tops}")  # for debugging
+    print("Tops: %s" % (tops,))  # for debugging
     meta = {
         "embedding_model": artifacts.get("embedding_model"),
         "embeddings_file": os.path.basename(emb_path),
@@ -188,10 +200,9 @@ def _fit_projection(label_tfidf, label_emb_unit):
 
 
 # 2) In startup: populate app.state instead of globals
-@app.on_event("startup")
-def _startup():
+def _initialize_model_state():
+    """Initialize model state - can be called during startup or for testing."""
     try:
-        logger.info("Starting MPS Connect API...")
         logger.info("Loading artifacts from: %s", MODEL_DIR)
 
         labels, tops, label_emb, meta = load_artifacts(MODEL_DIR)
@@ -212,7 +223,7 @@ def _startup():
         providers = load_providers_map(PROVIDERS_JSON)
         logger.info("Loaded %d provider mappings", len(providers))
 
-        app.state.ms = ModelState(
+        return ModelState(
             labels=labels,
             tops=tops,
             label_emb=label_emb,
@@ -221,14 +232,29 @@ def _startup():
             meta=meta,
             vs=vs,
         )
+    except (FileNotFoundError, RuntimeError, ValueError) as e:
+        logger.error("Model state initialization failed: %s", e)
+        raise
 
+
+@app.on_event("startup")
+def _startup():
+    try:
+        logger.info("Starting MPS Connect API...")
+        app.state.ms = _initialize_model_state()
         logger.info("MPS Connect API startup complete")
-    except Exception as e:
+    except (RuntimeError, ValueError, FileNotFoundError) as e:
         logger.error("Startup failed: %s", e)
         raise
 
 
 # 3) Replace global uses with app.state.ms (example in helpers)
+def _ensure_model_state():
+    """Ensure model state is initialized (for testing)."""
+    if not hasattr(app.state, "ms") or app.state.ms is None:
+        app.state.ms = _initialize_model_state()
+
+
 def _embed_texts(texts: List[str]) -> np.ndarray:
     ms = app.state.ms
     if ms.vs.vect is None:
@@ -247,18 +273,97 @@ def _embed_texts(texts: List[str]) -> np.ndarray:
 
 
 def score_texts(texts: List[str]) -> np.ndarray:
-    """Compute label scores for input texts using embedding or TF-IDF cosine."""
-    z_matrix = _embed_texts(texts)  # (n, D) or (n, V)
-    if z_matrix.shape[1] == app.state.ms.label_emb_unit.shape[1]:
-        scores = z_matrix @ app.state.ms.label_emb_unit.T  # (n, L)
+    """Compute label scores for input texts using natural language similarity."""
+    _ensure_model_state()
+    try:
+        if sentence_transformers is None:
+            raise ImportError("sentence_transformers not available")
+
+        # Load model with proper device handling
+        model = sentence_transformers.SentenceTransformer(
+            "sentence-transformers/all-MiniLM-L6-v2"
+        )
+
+        # Create natural language descriptions for labels
+        label_descriptions = []
+        for label in app.state.ms.labels:
+            parts = label.split("/")
+            if len(parts) == 2:
+                category, subcategory = parts
+                # Convert to natural language
+                category_nl = category.replace("_", " ").title()
+                subcategory_nl = subcategory.replace("_", " ").title()
+                description = f"{category_nl} related to {subcategory_nl}"
+            else:
+                description = label.replace("_", " ").title()
+            label_descriptions.append(description)
+
+        # Encode texts and labels
+        text_embeddings = model.encode(texts, convert_to_tensor=False)
+        label_embeddings = model.encode(label_descriptions, convert_to_tensor=False)
+
+        # Compute cosine similarity (prefer sklearn, fall back to numpy)
+        if sk_pairwise is not None:
+            scores = sk_pairwise.cosine_similarity(text_embeddings, label_embeddings)  # type: ignore[call-arg]
+        else:
+            te = np.asarray(text_embeddings, dtype=np.float32)
+            le = np.asarray(label_embeddings, dtype=np.float32)
+            te /= np.linalg.norm(te, axis=1, keepdims=True) + 1e-12
+            le /= np.linalg.norm(le, axis=1, keepdims=True) + 1e-12
+            scores = te @ le.T
+
+        logger.info(
+            "Natural language scores shape: %s, max score: %s",
+            scores.shape,
+            scores.max(),
+        )
         return scores.astype(np.float32)
 
-    # de-indented (no else)
-    x_tfidf = app.state.ms.vs.vect.transform(texts)
-    rn = np.sqrt(x_tfidf.multiply(x_tfidf).sum(axis=1)).A1 + 1e-12
-    x_tfidf = x_tfidf.multiply(1.0 / rn[:, None])
-    scores = (x_tfidf @ app.state.ms.vs.label_tfidf_unit.T).toarray()
-    return scores.astype(np.float32)
+    except (ImportError, OSError, RuntimeError, ValueError) as e:
+        logger.warning(
+            "Natural language processing failed, fallback to keywords: %s", e
+        )
+        # Simple keyword-based fallback
+        return _simple_keyword_scoring(texts)
+
+
+def _simple_keyword_scoring(texts: List[str]) -> np.ndarray:
+    """Simple keyword-based scoring as fallback."""
+    _ensure_model_state()
+
+    scores = np.zeros((len(texts), len(app.state.ms.labels)), dtype=np.float32)
+
+    for i, text in enumerate(texts):
+        text_lower = text.lower()
+
+        for j, label in enumerate(app.state.ms.labels):
+            parts = label.split("/")
+            if len(parts) == 2:
+                category, subcategory = parts
+
+                # Simple keyword matching
+                category_keywords = category.replace("_", " ").split()
+                subcategory_keywords = subcategory.replace("_", " ").split()
+
+                score = 0.0
+                for keyword in category_keywords + subcategory_keywords:
+                    if keyword in text_lower:
+                        score += 0.1
+
+                # Boost for exact matches
+                if category.replace("_", " ") in text_lower:
+                    score += 0.3
+                if subcategory.replace("_", " ") in text_lower:
+                    score += 0.5
+
+                scores[i, j] = min(score, 1.0)
+
+    logger.info(
+        "Keyword fallback scores shape: %s, max score: %s",
+        scores.shape,
+        scores.max(),
+    )
+    return scores
 
 
 class PredictIn(BaseModel):
@@ -273,6 +378,20 @@ class PredictIn(BaseModel):
     seed_prior_threshold: float = 0.45  # reserved for future priors
     use_priors: bool = True
     return_providers: bool = True
+    return_confidence_breakdown: bool = True
+
+
+class ConfidenceBreakdown(BaseModel):
+    """Confidence breakdown for auditing and approval workflows."""
+
+    label: str
+    confidence_score: float
+    category: str
+    subcategory: str
+    semantic_similarity: float
+    provider_info: Dict[str, Any]
+    approval_recommendation: str  # "auto_approve", "manual_review", "reject"
+    risk_level: str  # "low", "medium", "high"
 
 
 def _top_of(label: str) -> str:
@@ -346,6 +465,8 @@ def _select_labels(scores: np.ndarray, params: PredictIn):
             : max(1, params.top_k_total)
         ]
         chosen = [{"label": lab, "score": sc} for lab, sc in topk]
+
+        # Ensure tops_ranked is populated from chosen items
         tsc: Dict[str, float] = {}
         for lab, sc in topk:
             tt = _top_of(lab)
@@ -353,6 +474,16 @@ def _select_labels(scores: np.ndarray, params: PredictIn):
         tops_ranked = sorted(tsc.items(), key=lambda x: x[1], reverse=True)[
             : params.top_k_top
         ]
+
+        # If still empty, create from all available tops
+        if not tops_ranked:
+            all_tops: Dict[str, float] = {}
+            for lab, sc in items:
+                tt = _top_of(lab)
+                all_tops[tt] = max(all_tops.get(tt, 0.0), sc)
+            tops_ranked = sorted(all_tops.items(), key=lambda x: x[1], reverse=True)[
+                : params.top_k_top
+            ]
 
     return chosen, tops_ranked
 
@@ -384,6 +515,8 @@ def mount_routes(prefix: str = ""):
             raise HTTPException(status_code=400, detail="texts is empty")
         scores = score_texts(pi.texts)
         out = []
+        confidence_breakdowns = []
+
         for i, text in enumerate(pi.texts):
             chosen, tops_ranked = _select_labels(scores[i], pi)
             labels = [c["label"] for c in chosen]
@@ -391,7 +524,41 @@ def mount_routes(prefix: str = ""):
             providers = {}
             if pi.return_providers:
                 for lab in labels:
-                    providers[lab] = app.state.ms.vs.providers.get(lab) or {}
+                    providers[lab] = app.state.ms.providers.get(lab) or {}
+
+            # Generate confidence breakdown for auditing
+            text_confidence_breakdown = []
+            if pi.return_confidence_breakdown:
+                for c in chosen:
+                    label = c["label"]
+                    score = c["score"]
+                    category = _top_of(label)
+                    subcategory = label.split("/", 1)[1] if "/" in label else ""
+
+                    # Determine approval recommendation based on confidence
+                    if score >= 0.7:
+                        approval_rec = "auto_approve"
+                        risk_level = "low"
+                    elif score >= 0.4:
+                        approval_rec = "manual_review"
+                        risk_level = "medium"
+                    else:
+                        approval_rec = "reject"
+                        risk_level = "high"
+
+                    text_confidence_breakdown.append(
+                        ConfidenceBreakdown(
+                            label=label,
+                            confidence_score=score,
+                            category=category,
+                            subcategory=subcategory,
+                            semantic_similarity=score,
+                            provider_info=providers.get(label, {}),
+                            approval_recommendation=approval_rec,
+                            risk_level=risk_level,
+                        )
+                    )
+
             out.append(
                 {
                     "text": text,
@@ -401,7 +568,12 @@ def mount_routes(prefix: str = ""):
                     "providers": providers,
                 }
             )
-        return {"predictions": out}
+            confidence_breakdowns.append(text_confidence_breakdown)
+
+        result = {"predictions": out}
+        if pi.return_confidence_breakdown:
+            result["confidence_breakdown"] = confidence_breakdowns  # type: ignore[assignment]
+        return result
 
 
 # mount both root and /api for convenience

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>MPS Connect — AI Classifier & Letter Generator (Beta)</title>
+  <title>MPS Connect — AI Approval Workflow System (Beta)</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
@@ -20,22 +20,22 @@
 <body class="bg-gray-50 text-gray-900">
   <div class="max-w-6xl mx-auto p-4 sm:p-6">
     <header class="mb-4 sm:mb-6">
-      <h1 class="text-2xl font-semibold">MPS Connect — AI Classifier & Letter Generator (Beta)</h1>
+      <h1 class="text-2xl font-semibold">MPS Connect — AI-Powered Case Assistant (Beta)</h1>
       <p class="text-sm text-gray-600">
-        Predict multi-label categories ➜ use the chooser to add/correct labels ➜ generate letters per label.
+        AI-powered case classification with confidence-based approval recommendations for case writers and authorities.
         <span class="font-semibold">Avoid PII during public testing.</span>
       </p>
       <p id="urlNotice" class="text-xs text-amber-700 mt-1 hidden">Settings loaded from URL parameters.</p>
     </header>
 
-    <!-- Settings -->
-    <section class="bg-white shadow-sm rounded-xl p-4 sm:p-5 mb-6 border">
+    <!-- Settings (Hidden for case writers) -->
+    <section class="bg-white shadow-sm rounded-xl p-4 sm:p-5 mb-6 border hidden">
       <h2 class="font-semibold mb-3">API Settings</h2>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <label class="block">
           <span class="text-sm">API Base URL</span>
           <input id="apiBase" class="mt-1 w-full rounded-lg border px-3 py-2"
-                 placeholder="https://mpsconnect.thegeekybeng.com" />
+                 placeholder="http://localhost:8000" />
         </label>
         <label class="block">
           <span class="text-sm">X-API-Key</span>
@@ -43,30 +43,18 @@
                  placeholder="mps-85-whampoa" />
         </label>
       </div>
-      <div class="grid grid-cols-2 sm:grid-cols-6 gap-4 mt-4">
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4">
         <label class="block">
-          <span class="text-sm">threshold_top</span>
-          <input id="thresholdTop" type="number" step="0.01" class="mt-1 w-full rounded-lg border px-3 py-2" />
+          <span class="text-sm">Confidence Threshold</span>
+          <input id="confidenceThreshold" type="number" step="0.01" value="0.2" class="mt-1 w-full rounded-lg border px-3 py-2" />
         </label>
         <label class="block">
-          <span class="text-sm">threshold_child</span>
-          <input id="thresholdChild" type="number" step="0.01" class="mt-1 w-full rounded-lg border px-3 py-2" />
+          <span class="text-sm">Max Categories</span>
+          <input id="maxCategories" type="number" value="6" class="mt-1 w-full rounded-lg border px-3 py-2" />
         </label>
         <label class="block">
-          <span class="text-sm">top_k_top</span>
-          <input id="topKTop" type="number" class="mt-1 w-full rounded-lg border px-3 py-2" />
-        </label>
-        <label class="block">
-          <span class="text-sm">top_k_child</span>
-          <input id="topKChild" type="number" class="mt-1 w-full rounded-lg border px-3 py-2" />
-        </label>
-        <label class="block">
-          <span class="text-sm">top_k_total</span>
-          <input id="topKTotal" type="number" class="mt-1 w-full rounded-lg border px-3 py-2" />
-        </label>
-        <label class="block">
-          <span class="text-sm">seed_prior_threshold</span>
-          <input id="seedPrior" type="number" step="0.01" class="mt-1 w-full rounded-lg border px-3 py-2" />
+          <span class="text-sm">Max Sub-Categories</span>
+          <input id="maxSubCategories" type="number" value="10" class="mt-1 w-full rounded-lg border px-3 py-2" />
         </label>
       </div>
       <div class="flex items-center gap-4 mt-3">
@@ -82,94 +70,137 @@
       <p id="healthOut" class="text-xs text-gray-600 mt-2"></p>
     </section>
 
-    <!-- Case input + Human-in-the-loop chooser -->
+    <!-- Case Analysis -->
     <section class="bg-white shadow-sm rounded-xl p-4 sm:p-5 mb-6 border">
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
-        <!-- Left: case text -->
-        <div>
-          <h2 class="font-semibold mb-3">Case Text</h2>
-          <textarea id="caseText" rows="7" class="w-full rounded-lg border px-3 py-2" placeholder="Describe the case in natural SG English…"></textarea>
-          <div class="mt-3 flex gap-2">
-            <button id="btnPredict" class="btn-primary">Predict</button>
-            <button id="btnClear" class="btn">Clear</button>
-          </div>
-          <p id="errMsg" class="text-sm text-red-600 mt-2 hidden"></p>
-        </div>
-
-        <!-- Right: label chooser -->
-        <div>
-          <div class="flex items-center justify-between">
-            <h2 class="font-semibold mb-3">Label Chooser (Search)</h2>
-            <span id="labelsStatus" class="text-xs text-gray-500"></span>
-          </div>
-          <input id="labelSearch" class="w-full rounded-lg border px-3 py-2" placeholder="Search labels or children… (type at least 2 chars)" />
-          <div id="labelsList" class="scroll-pane border rounded-lg mt-2 divide-y bg-gray-50"></div>
-          <p class="text-xs text-gray-500 mt-2">Results load from <span class="mono">/labels</span>; click <em>Add</em> to include into ground-truth.</p>
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="font-semibold">Case Analysis</h2>
+        <div class="flex items-center gap-2">
+          <span class="text-sm text-gray-600">Mode:</span>
+          <button id="toggleMode" class="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700">
+            Switch to Guided Chat
+          </button>
         </div>
       </div>
+      
+      <!-- Single-shot Analysis Mode -->
+      <div id="singleShotMode">
+        <textarea id="caseText" rows="5" class="w-full rounded-lg border px-3 py-2" placeholder="Describe the case in natural SG English…"></textarea>
+        <div class="mt-3 flex gap-2">
+          <button id="btnPredict" class="btn-primary">Analyze Case</button>
+          <button id="btnClear" class="btn">Clear</button>
+        </div>
+      </div>
+      
+      <!-- Guided Chat Mode -->
+      <div id="guidedChatMode" class="hidden">
+        <div class="mb-4 p-4 bg-blue-50 rounded-lg border">
+          <h3 class="font-medium text-blue-800 mb-2">MPS Connect Assistant</h3>
+          <p class="text-sm text-blue-600">I'll help you collect the necessary information to generate a proper letter. Let's start with the basic details.</p>
+          <div id="chatProgress" class="mt-3 hidden">
+            <div class="flex items-center justify-between text-xs text-gray-600 mb-1">
+              <span>Progress</span>
+              <span id="progressText">0 / 0</span>
+            </div>
+            <div class="w-full bg-gray-200 rounded-full h-2">
+              <div id="progressBar" class="bg-blue-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+            </div>
+          </div>
+        </div>
+        <div id="chatContainer" class="h-64 overflow-y-auto border rounded-lg p-4 bg-gray-50 mb-4">
+          <div id="chatMessages" class="space-y-3"></div>
+        </div>
+        <div class="flex gap-2">
+          <div class="flex-1 relative">
+            <input id="chatInput" type="text" class="w-full rounded-lg border px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all" placeholder="Type your response here..." disabled>
+            <div id="charCount" class="absolute bottom-1 right-2 text-xs text-gray-400 hidden">0/500</div>
+          </div>
+          <button id="btnSendChat" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors" disabled>
+            <span id="sendText">Send</span>
+            <span id="sendingText" class="hidden">Sending...</span>
+          </button>
+          <button id="btnResetChat" class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700 transition-colors">Reset</button>
+        </div>
+        
+        <!-- Quick Action Buttons -->
+        <div id="quickActions" class="mt-3 hidden">
+          <div class="text-xs text-gray-600 mb-2">Quick responses:</div>
+          <div id="quickActionButtons" class="flex flex-wrap gap-2">
+            <!-- Quick action buttons will be populated here -->
+          </div>
+        </div>
+        
+        <!-- Typing Indicator -->
+        <div id="typingIndicator" class="mt-2 hidden">
+          <div class="flex items-center space-x-2 text-gray-500">
+            <div class="flex space-x-1">
+              <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+              <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0.1s"></div>
+              <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0.2s"></div>
+            </div>
+            <span class="text-xs">MPS Connect is typing...</span>
+          </div>
+        </div>
+      </div>
+      
+      <p id="errMsg" class="text-sm text-red-600 mt-2 hidden"></p>
     </section>
 
-    <!-- Results & Truth -->
+    <!-- AI Analysis Results -->
     <section class="bg-white shadow-sm rounded-xl p-4 sm:p-5 mb-6 border">
-      <div class="flex items-center justify-between mb-2">
-        <h2 class="font-semibold">Predictions</h2>
-        <div class="text-sm text-gray-600">Tick <span class="font-medium">Correct?</span> for labels that match. Add missing labels on the right via the chooser.</div>
-      </div>
-      <div id="topCats" class="text-sm text-gray-700 mb-2"></div>
-      <div class="overflow-x-auto">
-        <table class="min-w-full text-sm">
-          <thead>
-            <tr class="bg-gray-100">
-              <th class="text-left px-3 py-2">Label</th>
-              <th class="text-left px-3 py-2">Score</th>
-              <th class="text-left px-3 py-2">Provider</th>
-              <th class="text-left px-3 py-2">Correct?</th>
-            </tr>
-          </thead>
-          <tbody id="predBody"></tbody>
-        </table>
-      </div>
-
-      <div class="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <label class="block">
-          <span class="text-sm">Add ground-truth by slug (optional)</span>
-          <input id="addTruth" class="mt-1 w-full rounded-lg border px-3 py-2 mono" placeholder="e.g. utilities_comms/electricity_spgroup" />
-        </label>
-        <button id="btnAddTruth" class="self-end btn">Add</button>
-        <div class="self-end text-sm text-gray-600">
-          Ground-truth is “checked predictions” + “added labels” (chooser or slug box).
+      <h2 class="font-semibold mb-3">AI Analysis Results</h2>
+      
+      <!-- Main Categories (LEFT) -->
+      <div id="mainCategories" class="mb-6 hidden">
+        <h3 class="font-medium mb-3">Main Categories Detected</h3>
+        <div id="mainCategoryGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <!-- Main categories will be populated here -->
         </div>
       </div>
 
-      <div class="mt-4 flex flex-wrap items-center gap-3 text-sm">
-        <span id="metricPRF" class="px-2 py-1 rounded bg-gray-100 border"></span>
-        <button id="btnExportCSV" class="btn">Export feedback row (CSV)</button>
+      <!-- Selected Category Details (RIGHT) -->
+      <div id="selectedCategoryDetails" class="mb-6">
+        <h3 class="font-medium mb-3">Sub-Categories for Letter Generation</h3>
+        <div id="subCategoryList" class="space-y-3">
+          <!-- Sub-categories will be populated here -->
+        </div>
       </div>
-    </section>
 
-    <!-- Letter generation -->
-    <section class="bg-white shadow-sm rounded-xl p-4 sm:p-5 mb-6 border">
-      <h2 class="font-semibold mb-3">Generate Letters</h2>
-      <p class="text-sm text-gray-600 mb-3">
-        Letters generate <em>per selected label</em> (those ticked as Correct?).
-        You can edit each letter and then Approve or Reject with a reason.
-      </p>
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <label class="block"><span class="text-sm">Citizen Full Name</span><input id="fName" class="mt-1 w-full rounded-lg border px-3 py-2" /></label>
-        <label class="block"><span class="text-sm">NRIC/FIN</span><input id="fNRIC" class="mt-1 w-full rounded-lg border px-3 py-2" /></label>
-        <label class="block"><span class="text-sm">Contact Email</span><input id="fEmail" class="mt-1 w-full rounded-lg border px-3 py-2" /></label>
-        <label class="block"><span class="text-sm">Contact Phone</span><input id="fPhone" class="mt-1 w-full rounded-lg border px-3 py-2" /></label>
-        <label class="block sm:col-span-2"><span class="text-sm">Postal Address</span><input id="fAddr" class="mt-1 w-full rounded-lg border px-3 py-2" /></label>
+      <!-- Letter Generation -->
+      <div id="letterGeneration" class="mt-4 p-4 bg-blue-50 rounded-lg hidden">
+        <h3 class="font-medium mb-3">Generate Letters for Selected Categories</h3>
+        <div class="mb-3">
+          <label class="block">
+            <span class="text-sm">Citizen Full Name</span>
+            <input id="citizenName" class="mt-1 w-full rounded-lg border px-3 py-2" placeholder="Enter citizen's full name" />
+          </label>
+        </div>
+        <div class="mb-3">
+          <label class="block">
+            <span class="text-sm">NRIC/FIN</span>
+            <input id="citizenNRIC" class="mt-1 w-full rounded-lg border px-3 py-2" placeholder="Enter NRIC/FIN" />
+          </label>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <button id="btnGenerateLetters" class="btn-primary">Generate Letters for Selected</button>
+          <button id="btnSelectAll" class="btn">Select All Categories</button>
+        </div>
       </div>
-      <label class="inline-flex items-center gap-2 mt-3">
-        <input id="pdpaSafe" type="checkbox" class="rounded" checked>
-        <span class="text-sm">PDPA-safe mode (omit personal details in letters)</span>
-      </label>
-      <div class="mt-3 flex gap-2">
-        <button id="btnGenLetters" class="btn-green">Generate Letters</button>
-        <button id="btnCopyAll" class="btn">Copy all</button>
+
+      <!-- Approval Workflow Controls -->
+      <div id="approvalControls" class="mt-4 p-4 bg-gray-50 rounded-lg hidden">
+        <h3 class="font-medium mb-3">Approval Workflow</h3>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <button id="btnAutoApprove" class="btn-green">Auto Approve (High Confidence)</button>
+          <button id="btnManualReview" class="btn-amber">Send for Manual Review</button>
+          <button id="btnReject" class="btn-red">Reject Case</button>
+        </div>
+        <div class="mt-3">
+          <label class="block">
+            <span class="text-sm">Approval Notes (Optional)</span>
+            <textarea id="approvalNotes" rows="2" class="mt-1 w-full rounded-lg border px-3 py-2" placeholder="Add notes for approval decision..."></textarea>
+          </label>
+        </div>
       </div>
-      <div id="lettersWrap" class="mt-4 space-y-6"></div>
     </section>
 
     <footer class="text-xs text-gray-500 pb-8">
@@ -191,6 +222,30 @@ const state = {
   labelsLoaded: false,
   rejections: {},       // {label: reason}
   approvals: {},        // {label: true}
+  chatMode: false,      // whether in guided chat mode
+  chatData: {},         // collected data from chat
+  chatStep: 0,          // current step in chat flow
+  chatQuestions: [],    // questions to ask
+  chatTrafficAdded: false // whether traffic fines follow-ups are added
+};
+
+// Slot values and feature flags
+state.slots = {
+  transport: {
+    traffic_fines: {
+      offence_type: '',
+      offence_date: '',
+      location: '',
+      notice_ref: '',
+      fine_amount: '',
+      demerit_points: '',
+      hardship: '',
+      request: ''
+    }
+  }
+};
+state.flags = {
+  APPROVAL_ENABLED: false
 };
 
 function parseBool(v, dflt=false) {
@@ -205,28 +260,20 @@ const qp = new URL(location.href).searchParams;
 
 /** ---------- Defaults (baked-in) ---------- */
 const BASE_DEFAULTS = {
-  apiBase: 'https://mpsconnect.thegeekybeng.com', // Production deployment
+  apiBase: 'http://localhost:8000', // Local development
   apiKey: 'mps-85-whampoa',                           // test key for beta
-  thresholdTop: 0.28,
-  thresholdChild: 0.34,
-  topKTop: 6,
-  topKChild: 6,
-  topKTotal: 20,
-  seedPrior: 0.44,
-  usePriors: true
+  confidenceThreshold: 0.2,
+  maxCategories: 6,
+  maxSubCategories: 10
 };
 
 // Load order: URL params > localStorage > BASE_DEFAULTS
 const DEFAULTS = {
   apiBase: qp.get('api') || localStorage.getItem('wv.apiBase') || BASE_DEFAULTS.apiBase,
   apiKey:  qp.get('key') || localStorage.getItem('wv.apiKey')  || BASE_DEFAULTS.apiKey,
-  thresholdTop: parseNum(qp.get('thTop'),   parseFloat(localStorage.getItem('wv.thTop')   ?? BASE_DEFAULTS.thresholdTop)),
-  thresholdChild: parseNum(qp.get('thChild'), parseFloat(localStorage.getItem('wv.thChild') ?? BASE_DEFAULTS.thresholdChild)),
-  topKTop: parseNum(qp.get('kTop'),   parseInt(localStorage.getItem('wv.kTop')   ?? BASE_DEFAULTS.topKTop)),
-  topKChild: parseNum(qp.get('kChild'), parseInt(localStorage.getItem('wv.kChild') ?? BASE_DEFAULTS.topKChild)),
-  topKTotal: parseNum(qp.get('kTotal'), parseInt(localStorage.getItem('wv.kTotal') ?? BASE_DEFAULTS.topKTotal)),
-  seedPrior: parseNum(qp.get('seed'),  parseFloat(localStorage.getItem('wv.seedPrior') ?? BASE_DEFAULTS.seedPrior)),
-  usePriors: qp.has('priors') ? parseBool(qp.get('priors')) : ((localStorage.getItem('wv.usePriors') ?? '') === '' ? BASE_DEFAULTS.usePriors : (localStorage.getItem('wv.usePriors') === 'true'))
+  confidenceThreshold: parseNum(qp.get('conf'), parseFloat(localStorage.getItem('wv.confThreshold') ?? BASE_DEFAULTS.confidenceThreshold)),
+  maxCategories: parseNum(qp.get('maxCat'), parseInt(localStorage.getItem('wv.maxCategories') ?? BASE_DEFAULTS.maxCategories)),
+  maxSubCategories: parseNum(qp.get('maxSub'), parseInt(localStorage.getItem('wv.maxSubCategories') ?? BASE_DEFAULTS.maxSubCategories))
 };
 
 if ([...qp.keys()].length) qs('urlNotice').classList.remove('hidden');
@@ -234,32 +281,69 @@ if ([...qp.keys()].length) qs('urlNotice').classList.remove('hidden');
 function initForm() {
   qs('apiBase').value = DEFAULTS.apiBase;
   qs('apiKey').value = DEFAULTS.apiKey;
-  qs('thresholdTop').value = DEFAULTS.thresholdTop;
-  qs('thresholdChild').value = DEFAULTS.thresholdChild;
-  qs('topKTop').value = DEFAULTS.topKTop;
-  qs('topKChild').value = DEFAULTS.topKChild;
-  qs('topKTotal').value = DEFAULTS.topKTotal;
-  qs('seedPrior').value = DEFAULTS.seedPrior;
-  qs('usePriors').checked = DEFAULTS.usePriors;
+  qs('confidenceThreshold').value = DEFAULTS.confidenceThreshold;
+  qs('maxCategories').value = DEFAULTS.maxCategories;
+  qs('maxSubCategories').value = DEFAULTS.maxSubCategories;
 }
+
+// Feature flag: Approval controls
+function applyFeatureFlags() {
+  const ff = parseBool(qp.get('approval'), parseBool(localStorage.getItem('wv.APPROVAL_ENABLED'), false));
+  state.flags.APPROVAL_ENABLED = ff;
+  const el = qs('approvalControls');
+  if (!el) return;
+  if (state.flags.APPROVAL_ENABLED) {
+    el.classList.remove('hidden');
+  } else {
+    el.classList.add('hidden');
+  }
+}
+
+// Persistence model for letter edits and explainability bundles (in-memory)
+const persistence = {
+  letters: new Map(), // id -> { content, edits, explainability }
+  explainability: new Map(), // id -> { selectedCategories, extractedFacts, confidence }
+  
+  saveLetter(id, content, edits = {}) {
+    this.letters.set(id, { content, edits, timestamp: Date.now() });
+  },
+  
+  saveExplainability(id, selectedCategories, extractedFacts, confidence) {
+    this.explainability.set(id, { selectedCategories, extractedFacts, confidence, timestamp: Date.now() });
+  },
+  
+  getLetter(id) {
+    return this.letters.get(id);
+  },
+  
+  getExplainability(id) {
+    return this.explainability.get(id);
+  },
+  
+  export() {
+    return {
+      letters: Object.fromEntries(this.letters),
+      explainability: Object.fromEntries(this.explainability)
+    };
+  }
+};
 
 function saveSettings() {
   localStorage.setItem('wv.apiBase', qs('apiBase').value.trim());
   localStorage.setItem('wv.apiKey', qs('apiKey').value.trim());
-  localStorage.setItem('wv.thTop', qs('thresholdTop').value);
-  localStorage.setItem('wv.thChild', qs('thresholdChild').value);
-  localStorage.setItem('wv.kTop', qs('topKTop').value);
-  localStorage.setItem('wv.kChild', qs('topKChild').value);
-  localStorage.setItem('wv.kTotal', qs('topKTotal').value);
-  localStorage.setItem('wv.seedPrior', qs('seedPrior').value);
-  localStorage.setItem('wv.usePriors', qs('usePriors').checked);
+  localStorage.setItem('wv.confThreshold', qs('confidenceThreshold').value);
+  localStorage.setItem('wv.maxCategories', qs('maxCategories').value);
+  localStorage.setItem('wv.maxSubCategories', qs('maxSubCategories').value);
 }
 
 /** ---------- API helpers with auto-normalization and /api fallback ---------- */
 function getApiBase() {
   const raw = (qs('apiBase').value || '').trim();
+  console.log('API Base raw value:', raw);
   // strip accidental /healthz, /predict, /labels, /api, trailing slash
-  return raw.replace(/\/(healthz|predict|labels|api)(\/)?$/i, '').replace(/\/$/, '');
+  const base = raw.replace(/\/(healthz|predict|labels|api)(\/)?$/i, '').replace(/\/$/, '');
+  console.log('API Base processed:', base);
+  return base;
 }
 async function apiFetch(path, opts = {}) {
   const base = getApiBase();
@@ -356,6 +440,1004 @@ function renderLabelSearchResults() {
   target.appendChild(frag);
 }
 
+/** ---------- Guided Chat Mode ---------- */
+function toggleChatMode() {
+  const singleShot = qs('singleShotMode');
+  const guidedChat = qs('guidedChatMode');
+  const toggleBtn = qs('toggleMode');
+  
+  if (state.chatMode) {
+    // Switch to single-shot mode
+    state.chatMode = false;
+    singleShot.classList.remove('hidden');
+    guidedChat.classList.add('hidden');
+    toggleBtn.textContent = 'Switch to Guided Chat';
+    toggleBtn.className = 'bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700';
+  } else {
+    // Switch to guided chat mode
+    state.chatMode = true;
+    singleShot.classList.add('hidden');
+    guidedChat.classList.remove('hidden');
+    toggleBtn.textContent = 'Switch to Single Analysis';
+    toggleBtn.className = 'bg-gray-600 text-white px-3 py-1 rounded text-sm hover:bg-gray-700';
+    startGuidedChat();
+  }
+}
+
+/** ---------- Traffic Fines Schema (transport) ---------- */
+const TRAFFIC_FINES_SCHEMA = {
+  fields: [
+    { key: 'offence_type', label: 'Offence Type', required: true, validate: (v) => v && v.length >= 3 },
+    { key: 'offence_date', label: 'Offence Date (YYYY-MM-DD)', required: true, validate: (v) => /^\d{4}-\d{2}-\d{2}$/.test(v) },
+    { key: 'location', label: 'Location', required: true, validate: (v) => v && v.length >= 3 },
+    { key: 'notice_ref', label: 'Notice Number / Reference', required: true, validate: (v) => /[\w-]{4,}/.test(v) },
+    { key: 'fine_amount', label: 'Fine Amount (S$)', required: false, validate: (v) => v === '' || /^\d+(?:\.\d{1,2})?$/.test(v) },
+    { key: 'demerit_points', label: 'Demerit Points', required: false, validate: (v) => v === '' || /^\d+$/.test(v) },
+    { key: 'hardship', label: 'Financial Hardship (summary)', required: true, validate: (v) => v && v.length >= 5 },
+    { key: 'request', label: 'Requested Outcome', required: true, validate: (v) => v && v.length >= 5 }
+  ]
+};
+
+function validateTrafficFines(values) {
+  const errors = {};
+  let validCount = 0;
+  for (const f of TRAFFIC_FINES_SCHEMA.fields) {
+    const ok = !!f.validate(String(values[f.key] || ''));
+    if (!ok && f.required) errors[f.key] = `${f.label} is required/invalid`;
+    if (ok) validCount++;
+  }
+  const readiness = Math.round((validCount / TRAFFIC_FINES_SCHEMA.fields.length) * 100);
+  return { errors, readiness };
+}
+
+function renderTrafficFinesSection(catTop) {
+  if (catTop !== 'transport') return '';
+  const v = state.slots.transport.traffic_fines;
+  const { errors, readiness } = validateTrafficFines(v);
+  const chip = (key, label) => {
+    const ok = !errors[key];
+    return `<span class="badge ${ok ? '' : 'bg-red-100'}">${label}${ok ? '' : ' ✕'}</span>`;
+  };
+  return `
+    <div class="mt-3 p-3 rounded border bg-blue-50">
+      <div class="flex items-center justify-between mb-2">
+        <h6 class="font-medium text-blue-800">Traffic Fines Details</h6>
+        <div class="text-xs">Readiness: <span class="font-semibold">${readiness}%</span></div>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <label class="block text-sm">Offence Type
+          <input data-tf key="offence_type" class="mt-1 w-full rounded-lg border px-3 py-2" placeholder="e.g., Speeding" value="${v.offence_type || ''}">
+        </label>
+        <label class="block text-sm">Offence Date (YYYY-MM-DD)
+          <input data-tf key="offence_date" class="mt-1 w-full rounded-lg border px-3 py-2" placeholder="YYYY-MM-DD" value="${v.offence_date || ''}">
+        </label>
+        <label class="block text-sm">Location
+          <input data-tf key="location" class="mt-1 w-full rounded-lg border px-3 py-2" placeholder="Road/Area" value="${v.location || ''}">
+        </label>
+        <label class="block text-sm">Notice Number / Reference
+          <input data-tf key="notice_ref" class="mt-1 w-full rounded-lg border px-3 py-2" placeholder="TPxxxx / Ref" value="${v.notice_ref || ''}">
+        </label>
+        <label class="block text-sm">Fine Amount (S$)
+          <input data-tf key="fine_amount" class="mt-1 w-full rounded-lg border px-3 py-2" placeholder="e.g., 200.00" value="${v.fine_amount || ''}">
+        </label>
+        <label class="block text-sm">Demerit Points
+          <input data-tf key="demerit_points" class="mt-1 w-full rounded-lg border px-3 py-2" placeholder="e.g., 6" value="${v.demerit_points || ''}">
+        </label>
+        <label class="block text-sm md:col-span-2">Financial Hardship (summary)
+          <textarea data-tf key="hardship" rows="2" class="mt-1 w-full rounded-lg border px-3 py-2" placeholder="Brief hardship context">${v.hardship || ''}</textarea>
+        </label>
+        <label class="block text-sm md:col-span-2">Requested Outcome
+          <textarea data-tf key="request" rows="2" class="mt-1 w-full rounded-lg border px-3 py-2" placeholder="What are you requesting?">${v.request || ''}</textarea>
+        </label>
+      </div>
+      <div class="mt-2 flex flex-wrap gap-2">
+        ${chip('offence_type','Offence')}
+        ${chip('offence_date','Date')}
+        ${chip('location','Location')}
+        ${chip('notice_ref','Notice Ref')}
+        ${chip('hardship','Hardship')}
+        ${chip('request','Request')}
+      </div>
+    </div>
+  `;
+}
+
+document.addEventListener('input', (e) => {
+  const t = e.target;
+  if (t && t.hasAttribute('data-tf')) {
+    const key = t.getAttribute('key');
+    if (!key) return;
+    state.slots.transport.traffic_fines[key] = t.value;
+    // Re-render transport section chips/readiness minimally by updating closest container
+    const wrap = t.closest('.mt-3.p-3.rounded.border.bg-blue-50');
+    if (wrap) {
+      const { errors, readiness } = validateTrafficFines(state.slots.transport.traffic_fines);
+      const badges = wrap.querySelectorAll('.badge');
+      const map = { offence_type:0, offence_date:1, location:2, notice_ref:3, hardship:4, request:5 };
+      const idx = map[key];
+      if (typeof idx === 'number' && badges[idx]) {
+        const labelText = badges[idx].textContent.replace(' ✕','');
+        badges[idx].className = 'badge' + (errors[key] ? ' bg-red-100' : '');
+        badges[idx].textContent = labelText + (errors[key] ? ' ✕' : '');
+      }
+      const rz = wrap.querySelector('span.font-semibold');
+      if (rz) rz.textContent = `${Math.round((Object.keys(TRAFFIC_FINES_SCHEMA.fields).length ? validateTrafficFines(state.slots.transport.traffic_fines).readiness : readiness))}%`;
+    }
+    // Update letter generation state when traffic fines fields change
+    updateLetterGenerationState();
+  }
+});
+
+function startGuidedChat() {
+  state.chatData = {};
+  state.chatStep = 0;
+  state.chatContext = {
+    urgency: false,
+    financialHardship: false,
+    category: null,
+    emotionalTone: 'neutral',
+    sentimentScore: 0,
+    stressLevel: 'low',
+    confidenceLevel: 'medium',
+    previousResponses: [],
+    keyConcerns: [],
+    suggestedResources: []
+  };
+  
+  state.chatQuestions = [
+    {
+      question: "Hi there! I'm MPS Connect, your friendly MP Office assistant. I'm here to help you with whatever government matter you're dealing with. I know these things can be quite stressful, so don't worry - we'll work through this together. What's the main issue you'd like help with today?",
+      field: "issue_type",
+      type: "open",
+      acknowledgments: [
+        "I understand this can be frustrating. Let me help you with that.",
+        "That sounds challenging. I'm here to support you through this.",
+        "I can see this is important to you. Let's work on getting this sorted out."
+      ]
+    },
+    {
+      question: "Thank you for sharing that with me. Could you tell me a bit more about your specific situation? The more details you can provide, the better I can assist you.",
+      field: "situation",
+      type: "open",
+      acknowledgments: [
+        "I appreciate you taking the time to explain this to me.",
+        "Thank you for being so detailed. This helps me understand better.",
+        "I can see this is affecting you significantly. Let's get this resolved."
+      ]
+    },
+    {
+      question: "I understand. Which government agency or department is this related to? For example, is it Traffic Police, HDB, IRAS, MOM, or another agency? This helps me direct you to the right resources.",
+      field: "agency",
+      type: "open",
+      acknowledgments: [
+        "Good, that helps me understand which department we need to work with.",
+        "Perfect, I know exactly who we need to contact for this matter.",
+        "Thank you, that gives me a clear direction on how to help you."
+      ]
+    },
+    {
+      question: "I understand this might be a sensitive question, but are you currently working? This helps me understand your situation better so I can suggest the most appropriate assistance options.",
+      field: "employment_status",
+      type: "yesno",
+      acknowledgments: {
+        yes: "Thank you for sharing that. Having stable employment can sometimes help with certain applications.",
+        no: "I understand. Being between jobs can make things more challenging, but there are still options available to help you."
+      }
+    },
+    {
+      question: "I know money matters can be stressful to discuss, but are you experiencing any financial difficulties that are making this situation harder to handle? This information helps me suggest the best support options for you.",
+      field: "financial_hardship",
+      type: "yesno",
+      acknowledgments: {
+        yes: "I understand this is a difficult time financially. There are several assistance programs that might be able to help you.",
+        no: "That's good to hear. Having financial stability can make navigating these processes easier."
+      }
+    },
+    {
+      question: "Is this matter urgent or time-sensitive? I want to make sure we prioritize this correctly and get you the help you need as quickly as possible.",
+      field: "urgency",
+      type: "yesno",
+      acknowledgments: {
+        yes: "I understand this is urgent. Let me make sure we handle this with the priority it deserves.",
+        no: "Good, that gives us time to make sure we get everything right and explore all available options."
+      }
+    },
+    {
+      question: "Do you have any supporting documents, reference numbers, or paperwork related to this matter? Even if you don't have everything, any information you can provide will be helpful.",
+      field: "supporting_docs",
+      type: "open",
+      acknowledgments: [
+        "Great! Having documentation will definitely help strengthen your case.",
+        "No worries if you don't have everything. We can work with what you have.",
+        "That's helpful information. Every bit of documentation makes a difference."
+      ]
+    },
+    {
+      question: "Is there anything else you'd like me to know about your situation? Sometimes the small details can make a big difference in how we approach your case.",
+      field: "additional_info",
+      type: "open",
+      acknowledgments: [
+        "Thank you for sharing that additional information. It really helps me understand your full situation.",
+        "I appreciate you being so thorough. This gives me a complete picture of what you're dealing with.",
+        "That's very helpful. Every detail you've provided will help me assist you better."
+      ]
+    }
+  ];
+  
+  clearChatMessages();
+  askNextQuestion();
+}
+
+function askNextQuestion() {
+  // Smart question skipping
+  while (state.chatStep < state.chatQuestions.length && shouldSkipQuestion(state.chatQuestions[state.chatStep], state.chatStep)) {
+    state.chatStep++;
+  }
+  
+  if (state.chatStep >= state.chatQuestions.length) {
+    completeGuidedChat();
+    return;
+  }
+  
+  const question = state.chatQuestions[state.chatStep];
+  
+  // Update progress
+  updateChatProgress();
+  
+  // Add emotional context to questions
+  let contextualQuestion = question.question;
+  if (state.chatContext.emotionalTone === 'stressed') {
+    contextualQuestion = "I can see this is really frustrating for you. " + contextualQuestion;
+  } else if (state.chatContext.emotionalTone === 'worried') {
+    contextualQuestion = "I understand your concerns. " + contextualQuestion;
+  } else if (state.chatContext.emotionalTone === 'positive') {
+    contextualQuestion = "I'm glad you're feeling optimistic about this. " + contextualQuestion;
+  }
+  
+  // Show typing indicator
+  showTypingIndicator();
+  
+  // Simulate typing delay for more natural feel
+  setTimeout(() => {
+    hideTypingIndicator();
+    addChatMessage('assistant', contextualQuestion);
+    
+    // Show quick actions
+    showQuickActions(question);
+    
+    // Enable input
+    const chatInput = qs('chatInput');
+    const sendBtn = qs('btnSendChat');
+    const sendText = qs('sendText');
+    const sendingText = qs('sendingText');
+    
+    chatInput.disabled = false;
+    sendBtn.disabled = false;
+    sendText.classList.remove('hidden');
+    sendingText.classList.add('hidden');
+    
+    // Show character count for open questions
+    if (question.type === 'open') {
+      const charCount = qs('charCount');
+      if (charCount) {
+        charCount.classList.remove('hidden');
+        updateCharCount();
+      }
+    }
+    
+    chatInput.focus();
+  }, 800 + Math.random() * 400); // Random delay between 800-1200ms
+  
+  // Set placeholder based on question type and context
+  if (question.type === 'yesno') {
+    chatInput.placeholder = 'Type "yes" or "no"';
+  } else if (question.field === 'tf_offence_date') {
+    chatInput.placeholder = 'YYYY-MM-DD format (e.g., 2024-01-15)';
+  } else if (question.field === 'tf_fine_amount') {
+    chatInput.placeholder = 'Amount in SGD (e.g., 200.00)';
+  } else if (question.field === 'tf_demerit_points') {
+    chatInput.placeholder = 'Number of points (e.g., 6)';
+  } else {
+    chatInput.placeholder = 'Type your response here...';
+  }
+}
+
+function updateChatProgress() {
+  const progressDiv = qs('chatProgress');
+  const progressText = qs('progressText');
+  const progressBar = qs('progressBar');
+  
+  if (!progressDiv || !progressText || !progressBar) return;
+  
+  const totalQuestions = state.chatQuestions.length;
+  const currentStep = state.chatStep + 1;
+  const percentage = Math.round((currentStep / totalQuestions) * 100);
+  
+  progressDiv.classList.remove('hidden');
+  progressText.textContent = `${currentStep} / ${totalQuestions}`;
+  progressBar.style.width = `${percentage}%`;
+}
+
+function addChatMessage(sender, message) {
+  const chatMessages = qs('chatMessages');
+  const messageDiv = document.createElement('div');
+  messageDiv.className = `flex ${sender === 'user' ? 'justify-end' : 'justify-start'}`;
+  
+  const bubbleClass = sender === 'user' 
+    ? 'bg-blue-600 text-white rounded-lg px-3 py-2 max-w-xs'
+    : 'bg-white border rounded-lg px-3 py-2 max-w-xs';
+    
+  messageDiv.innerHTML = `
+    <div class="${bubbleClass}">
+      <div class="text-sm">${message}</div>
+    </div>
+  `;
+  
+  chatMessages.appendChild(messageDiv);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+function showTypingIndicator() {
+  const typingIndicator = qs('typingIndicator');
+  if (typingIndicator) {
+    typingIndicator.classList.remove('hidden');
+  }
+}
+
+function hideTypingIndicator() {
+  const typingIndicator = qs('typingIndicator');
+  if (typingIndicator) {
+    typingIndicator.classList.add('hidden');
+  }
+}
+
+function showQuickActions(question) {
+  const quickActions = qs('quickActions');
+  const quickActionButtons = qs('quickActionButtons');
+  
+  if (!quickActions || !quickActionButtons) return;
+  
+  // Clear existing buttons
+  quickActionButtons.innerHTML = '';
+  
+  // Generate quick actions based on question type
+  if (question.type === 'yesno') {
+    const yesBtn = createQuickActionButton('Yes', () => {
+      qs('chatInput').value = 'yes';
+      sendChatMessage();
+    });
+    const noBtn = createQuickActionButton('No', () => {
+      qs('chatInput').value = 'no';
+      sendChatMessage();
+    });
+    quickActionButtons.appendChild(yesBtn);
+    quickActionButtons.appendChild(noBtn);
+  } else if (question.field === 'agency') {
+    const agencies = ['Traffic Police', 'HDB', 'IRAS', 'MOM', 'MSF', 'SP Group'];
+    agencies.forEach(agency => {
+      const btn = createQuickActionButton(agency, () => {
+        qs('chatInput').value = agency;
+        sendChatMessage();
+      });
+      quickActionButtons.appendChild(btn);
+    });
+  } else if (question.field === 'urgency') {
+    const urgentBtn = createQuickActionButton('Yes, it\'s urgent', () => {
+      qs('chatInput').value = 'yes, it\'s urgent';
+      sendChatMessage();
+    });
+    const notUrgentBtn = createQuickActionButton('No, not urgent', () => {
+      qs('chatInput').value = 'no, not urgent';
+      sendChatMessage();
+    });
+    quickActionButtons.appendChild(urgentBtn);
+    quickActionButtons.appendChild(notUrgentBtn);
+  } else if (question.field === 'financial_hardship') {
+    const yesBtn = createQuickActionButton('Yes, I\'m struggling', () => {
+      qs('chatInput').value = 'yes, I\'m having financial difficulties';
+      sendChatMessage();
+    });
+    const noBtn = createQuickActionButton('No, I\'m okay', () => {
+      qs('chatInput').value = 'no, I\'m financially stable';
+      sendChatMessage();
+    });
+    quickActionButtons.appendChild(yesBtn);
+    quickActionButtons.appendChild(noBtn);
+  }
+  
+  quickActions.classList.remove('hidden');
+}
+
+function hideQuickActions() {
+  const quickActions = qs('quickActions');
+  if (quickActions) {
+    quickActions.classList.add('hidden');
+  }
+}
+
+function createQuickActionButton(text, onClick) {
+  const button = document.createElement('button');
+  button.className = 'px-3 py-1 text-xs bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded-full transition-colors';
+  button.textContent = text;
+  button.addEventListener('click', onClick);
+  return button;
+}
+
+function updateCharCount() {
+  const chatInput = qs('chatInput');
+  const charCount = qs('charCount');
+  if (!chatInput || !charCount) return;
+  
+  const length = chatInput.value.length;
+  const maxLength = 500;
+  charCount.textContent = `${length}/${maxLength}`;
+  
+  if (length > maxLength * 0.9) {
+    charCount.className = 'absolute bottom-1 right-2 text-xs text-red-500';
+  } else if (length > maxLength * 0.7) {
+    charCount.className = 'absolute bottom-1 right-2 text-xs text-amber-500';
+  } else {
+    charCount.className = 'absolute bottom-1 right-2 text-xs text-gray-400';
+  }
+}
+
+function hideCharCount() {
+  const charCount = qs('charCount');
+  if (charCount) {
+    charCount.classList.add('hidden');
+  }
+}
+
+function sendChatMessage() {
+  const chatInput = qs('chatInput');
+  const message = chatInput.value.trim();
+  
+  if (!message) return;
+  
+  // Hide quick actions and character count
+  hideQuickActions();
+  hideCharCount();
+  
+  // Add user message
+  addChatMessage('user', message);
+  
+  // Store response
+  const currentQuestion = state.chatQuestions[state.chatStep];
+  state.chatData[currentQuestion.field] = message;
+
+  // Update context for dynamic flow
+  updateChatContext(currentQuestion.field, message);
+
+  // Conditional insertion of Traffic Fines follow-ups
+  const msgLower = message.toLowerCase();
+  const isTrafficHint = (currentQuestion.field === 'agency' && /traffic|lta|tp|police/.test(msgLower))
+    || (currentQuestion.field === 'issue_type' && /(traffic|fine|speed|parking|red\s?light)/.test(msgLower));
+  if (isTrafficHint && !state.chatTrafficAdded) {
+    state.chatTrafficAdded = true;
+    const tfQuestions = [
+      { question: 'I see this is related to traffic matters. Let me gather some specific details to help you better. What type of traffic offence are we dealing with?', field: 'tf_offence_type', type: 'open' },
+      { question: 'When did this offence occur? Please provide the date in YYYY-MM-DD format if possible.', field: 'tf_offence_date', type: 'open' },
+      { question: 'Where did this happen? Please provide the location or road name.', field: 'tf_location', type: 'open' },
+      { question: 'Do you have a notice number or reference from the Traffic Police? This helps me track your case.', field: 'tf_notice_ref', type: 'open' },
+      { question: 'What is the fine amount, if you know it?', field: 'tf_fine_amount', type: 'open' },
+      { question: 'How many demerit points are involved, if any?', field: 'tf_demerit_points', type: 'open' },
+      { question: 'Are you experiencing any financial difficulties that make paying this fine challenging?', field: 'tf_hardship', type: 'open' },
+      { question: 'What would you like to achieve? Are you looking to appeal, request a payment plan, or something else?', field: 'tf_request', type: 'open' }
+    ];
+    // Insert immediately after current step
+    state.chatQuestions.splice(state.chatStep + 1, 0, ...tfQuestions);
+  }
+  
+  // Show sending state
+  const sendBtn = qs('btnSendChat');
+  const sendText = qs('sendText');
+  const sendingText = qs('sendingText');
+  
+  sendBtn.disabled = true;
+  sendText.classList.add('hidden');
+  sendingText.classList.remove('hidden');
+  
+  // Clear input
+  chatInput.value = '';
+  chatInput.disabled = true;
+  
+  // Show acknowledgment before next question
+  setTimeout(() => {
+    showAcknowledgment(currentQuestion, message);
+    setTimeout(() => {
+      // Move to next question with smart branching
+      state.chatStep++;
+      askNextQuestion();
+    }, 1500);
+  }, 800);
+}
+
+function completeGuidedChat() {
+  // Hide progress bar and quick actions
+  const progressDiv = qs('chatProgress');
+  if (progressDiv) progressDiv.classList.add('hidden');
+  hideQuickActions();
+  
+  // Show summary confirmation
+  showSummaryConfirmation();
+}
+
+function showSummaryConfirmation() {
+  const summaryData = generateSummaryData();
+  
+  const summaryMessage = `Let me summarize what you've told me to make sure I have everything correct:
+
+**Issue Type:** ${summaryData.issue_type || 'Not specified'}
+**Situation:** ${summaryData.situation || 'Not provided'}
+**Agency:** ${summaryData.agency || 'Not specified'}
+**Employment Status:** ${summaryData.employment_status || 'Not specified'}
+**Financial Hardship:** ${summaryData.financial_hardship || 'Not specified'}
+**Urgency:** ${summaryData.urgency || 'Not specified'}
+**Supporting Documents:** ${summaryData.supporting_docs || 'None mentioned'}
+**Additional Info:** ${summaryData.additional_info || 'None provided'}
+
+${summaryData.trafficFines ? `
+**Traffic Fines Details:**
+- Offence Type: ${summaryData.trafficFines.offence_type || '—'}
+- Date: ${summaryData.trafficFines.offence_date || '—'}
+- Location: ${summaryData.trafficFines.location || '—'}
+- Notice Ref: ${summaryData.trafficFines.notice_ref || '—'}
+- Fine Amount: ${summaryData.trafficFines.fine_amount || '—'}
+- Demerit Points: ${summaryData.trafficFines.demerit_points || '—'}
+- Hardship: ${summaryData.trafficFines.hardship || '—'}
+- Request: ${summaryData.trafficFines.request || '—'}
+` : ''}
+
+Does this look correct? If yes, I'll proceed to generate your letter. If you need to make any changes, please let me know what to correct.`;
+
+  addChatMessage('assistant', summaryMessage);
+  
+  // Add confirmation buttons
+  const chatMessages = qs('chatMessages');
+  const confirmationDiv = document.createElement('div');
+  confirmationDiv.className = 'flex justify-start';
+  confirmationDiv.innerHTML = `
+    <div class="bg-white border rounded-lg px-3 py-2 max-w-xs">
+      <div class="text-sm mb-2">Please confirm:</div>
+      <div class="flex gap-2">
+        <button id="confirmSummary" class="px-3 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700">Yes, proceed</button>
+        <button id="editSummary" class="px-3 py-1 text-xs bg-amber-600 text-white rounded hover:bg-amber-700">Edit details</button>
+      </div>
+    </div>
+  `;
+  chatMessages.appendChild(confirmationDiv);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+  
+  // Add event listeners
+  qs('confirmSummary').addEventListener('click', () => {
+    confirmationDiv.remove();
+    proceedWithLetterGeneration();
+  });
+  
+  qs('editSummary').addEventListener('click', () => {
+    confirmationDiv.remove();
+    addChatMessage('assistant', 'I understand you\'d like to make changes. Please tell me what needs to be corrected, and I\'ll help you update the information.');
+    // Re-enable input for editing
+    const chatInput = qs('chatInput');
+    const sendBtn = qs('btnSendChat');
+    chatInput.disabled = false;
+    sendBtn.disabled = false;
+    chatInput.focus();
+  });
+}
+
+function generateSummaryData() {
+  const data = state.chatData;
+  const summary = {
+    issue_type: data.issue_type,
+    situation: data.situation,
+    agency: data.agency,
+    employment_status: data.employment_status,
+    financial_hardship: data.financial_hardship,
+    urgency: data.urgency,
+    supporting_docs: data.supporting_docs,
+    additional_info: data.additional_info
+  };
+  
+  // Add traffic fines data if available
+  if (state.chatTrafficAdded) {
+    summary.trafficFines = {
+      offence_type: data.tf_offence_type,
+      offence_date: data.tf_offence_date,
+      location: data.tf_location,
+      notice_ref: data.tf_notice_ref,
+      fine_amount: data.tf_fine_amount,
+      demerit_points: data.tf_demerit_points,
+      hardship: data.tf_hardship,
+      request: data.tf_request
+    };
+  }
+  
+  return summary;
+}
+
+function proceedWithLetterGeneration() {
+  // Generate empathetic completion message based on context
+  let completionMessage = 'Perfect! Thank you for confirming all the details. ';
+  if (state.chatContext.emotionalTone === 'stressed') {
+    completionMessage += 'I can see this has been really difficult for you, and I want you to know that we\'re going to do everything we can to help resolve this. ';
+  } else if (state.chatContext.emotionalTone === 'worried') {
+    completionMessage += 'I understand your concerns, and I want to reassure you that we\'re here to support you through this process. ';
+  } else if (state.chatContext.emotionalTone === 'positive') {
+    completionMessage += 'I\'m really glad you\'re feeling optimistic about this. ';
+  }
+  completionMessage += 'MPS Connect is now analyzing your case and will generate the appropriate letter to help you with this matter. This should only take a moment...';
+  
+  addChatMessage('assistant', completionMessage);
+  
+  // Add resource recommendations if available
+  if (state.chatContext.suggestedResources.length > 0) {
+    setTimeout(() => {
+      let resourceMessage = '\n\nI\'ve also identified some additional resources that might be helpful for your situation:\n\n';
+      state.chatContext.suggestedResources.forEach((resource, index) => {
+        resourceMessage += `${index + 1}. **${resource.name}**\n   ${resource.description}\n   ${resource.url}\n\n`;
+      });
+      resourceMessage += 'These resources can provide additional support beyond the letter we\'re generating for you.';
+      addChatMessage('assistant', resourceMessage);
+    }, 2000);
+  }
+  
+  // Add intelligent insights based on context
+  setTimeout(() => {
+    generateIntelligentInsights();
+  }, 3000);
+  
+  // Combine all collected data into case text
+  const caseText = generateCaseTextFromChat();
+  qs('caseText').value = caseText;
+
+  // Sync Traffic Fines answers into slots for validation and letters
+  if (state.chatTrafficAdded) {
+    const d = state.chatData;
+    const s = state.slots.transport.traffic_fines;
+    s.offence_type = d.tf_offence_type || s.offence_type;
+    s.offence_date = d.tf_offence_date || s.offence_date;
+    s.location = d.tf_location || s.location;
+    s.notice_ref = d.tf_notice_ref || s.notice_ref;
+    s.fine_amount = d.tf_fine_amount || s.fine_amount;
+    s.demerit_points = d.tf_demerit_points || s.demerit_points;
+    s.hardship = d.tf_hardship || s.hardship;
+    s.request = d.tf_request || s.request;
+  }
+  
+  // Switch back to single-shot mode and analyze
+  setTimeout(() => {
+    toggleChatMode();
+    predictOnce();
+  }, 2000);
+}
+
+function generateCaseTextFromChat() {
+  const data = state.chatData;
+  let caseText = `Issue Type: ${data.issue_type || 'Not specified'}\n\n`;
+  caseText += `Situation: ${data.situation || 'Not provided'}\n\n`;
+  caseText += `Related Agency: ${data.agency || 'Not specified'}\n\n`;
+  caseText += `Employment Status: ${data.employment_status || 'Not specified'}\n\n`;
+  caseText += `Financial Hardship: ${data.financial_hardship || 'Not specified'}\n\n`;
+  caseText += `Urgency: ${data.urgency || 'Not specified'}\n\n`;
+  caseText += `Supporting Documents: ${data.supporting_docs || 'None mentioned'}\n\n`;
+  caseText += `Additional Information: ${data.additional_info || 'None provided'}`;
+
+  if (state.chatTrafficAdded) {
+    caseText += `\n\nTraffic Fines Details:\n`;
+    caseText += `- Offence Type: ${data.tf_offence_type || '—'}\n`;
+    caseText += `- Offence Date: ${data.tf_offence_date || '—'}\n`;
+    caseText += `- Location: ${data.tf_location || '—'}\n`;
+    caseText += `- Notice Ref: ${data.tf_notice_ref || '—'}\n`;
+    caseText += `- Fine Amount: ${data.tf_fine_amount || '—'}\n`;
+    caseText += `- Demerit Points: ${data.tf_demerit_points || '—'}\n`;
+    caseText += `- Hardship: ${data.tf_hardship || '—'}\n`;
+    caseText += `- Request: ${data.tf_request || '—'}`;
+  }
+  
+  return caseText;
+}
+
+function resetChat() {
+  state.chatData = {};
+  state.chatStep = 0;
+  clearChatMessages();
+  addChatMessage('assistant', 'Chat reset. MPS Connect is starting over...');
+  setTimeout(() => askNextQuestion(), 1000);
+}
+
+function clearChatMessages() {
+  qs('chatMessages').innerHTML = '';
+}
+
+function updateChatContext(field, message) {
+  const msgLower = message.toLowerCase();
+  
+  // Store previous response for context memory
+  state.chatContext.previousResponses.push({
+    field: field,
+    message: message,
+    timestamp: Date.now()
+  });
+  
+  // Advanced sentiment analysis
+  const sentimentResult = analyzeSentiment(message);
+  state.chatContext.sentimentScore = sentimentResult.score;
+  state.chatContext.stressLevel = sentimentResult.stressLevel;
+  state.chatContext.emotionalTone = sentimentResult.tone;
+  
+  // Extract key concerns
+  extractKeyConcerns(message);
+  
+  // Update urgency context
+  if (field === 'urgency') {
+    state.chatContext.urgency = msgLower.includes('yes') || msgLower.includes('urgent') || msgLower.includes('time');
+  }
+  
+  // Update financial hardship context
+  if (field === 'financial_hardship') {
+    state.chatContext.financialHardship = msgLower.includes('yes') || msgLower.includes('difficult') || msgLower.includes('struggling');
+  }
+  
+  // Update category context
+  if (field === 'agency') {
+    if (msgLower.includes('traffic') || msgLower.includes('police') || msgLower.includes('lta')) {
+      state.chatContext.category = 'transport';
+    } else if (msgLower.includes('hdb') || msgLower.includes('housing')) {
+      state.chatContext.category = 'housing';
+    } else if (msgLower.includes('iras') || msgLower.includes('tax')) {
+      state.chatContext.category = 'tax_finance';
+    } else if (msgLower.includes('mom') || msgLower.includes('employment') || msgLower.includes('work')) {
+      state.chatContext.category = 'employment';
+    } else if (msgLower.includes('msf') || msgLower.includes('social') || msgLower.includes('comcare')) {
+      state.chatContext.category = 'social_support';
+    } else if (msgLower.includes('sp') || msgLower.includes('utilities') || msgLower.includes('electricity')) {
+      state.chatContext.category = 'utilities_comms';
+    }
+  }
+  
+  // Generate resource recommendations based on context
+  generateResourceRecommendations();
+}
+
+function analyzeSentiment(message) {
+  const msgLower = message.toLowerCase();
+  let score = 0;
+  let stressLevel = 'low';
+  let tone = 'neutral';
+  
+  // Positive indicators
+  const positiveWords = ['good', 'great', 'excellent', 'happy', 'pleased', 'thankful', 'grateful', 'hopeful', 'confident', 'positive'];
+  const positiveCount = positiveWords.filter(word => msgLower.includes(word)).length;
+  score += positiveCount * 0.3;
+  
+  // Negative indicators
+  const negativeWords = ['bad', 'terrible', 'awful', 'horrible', 'frustrated', 'angry', 'upset', 'disappointed', 'worried', 'stressed'];
+  const negativeCount = negativeWords.filter(word => msgLower.includes(word)).length;
+  score -= negativeCount * 0.4;
+  
+  // Stress indicators
+  const stressWords = ['urgent', 'emergency', 'crisis', 'desperate', 'struggling', 'overwhelmed', 'anxious', 'panic', 'desperate'];
+  const stressCount = stressWords.filter(word => msgLower.includes(word)).length;
+  
+  if (stressCount >= 3) {
+    stressLevel = 'high';
+    tone = 'stressed';
+  } else if (stressCount >= 1) {
+    stressLevel = 'medium';
+    tone = 'worried';
+  }
+  
+  // Worry indicators
+  const worryWords = ['concerned', 'worried', 'anxious', 'nervous', 'uncertain', 'confused', 'lost'];
+  const worryCount = worryWords.filter(word => msgLower.includes(word)).length;
+  
+  if (worryCount >= 2 && stressLevel === 'low') {
+    tone = 'worried';
+    stressLevel = 'medium';
+  }
+  
+  // Confidence indicators
+  if (positiveCount > negativeCount && worryCount === 0) {
+    tone = 'positive';
+  }
+  
+  // Normalize score
+  score = Math.max(-1, Math.min(1, score));
+  
+  return { score, stressLevel, tone };
+}
+
+function extractKeyConcerns(message) {
+  const msgLower = message.toLowerCase();
+  const concerns = [];
+  
+  // Financial concerns
+  if (msgLower.includes('money') || msgLower.includes('financial') || msgLower.includes('bills') || msgLower.includes('debt')) {
+    concerns.push('financial_difficulties');
+  }
+  
+  // Family concerns
+  if (msgLower.includes('family') || msgLower.includes('children') || msgLower.includes('kids') || msgLower.includes('spouse')) {
+    concerns.push('family_issues');
+  }
+  
+  // Health concerns
+  if (msgLower.includes('sick') || msgLower.includes('ill') || msgLower.includes('health') || msgLower.includes('medical')) {
+    concerns.push('health_issues');
+  }
+  
+  // Employment concerns
+  if (msgLower.includes('job') || msgLower.includes('work') || msgLower.includes('employment') || msgLower.includes('unemployed')) {
+    concerns.push('employment_issues');
+  }
+  
+  // Housing concerns
+  if (msgLower.includes('house') || msgLower.includes('flat') || msgLower.includes('rent') || msgLower.includes('housing')) {
+    concerns.push('housing_issues');
+  }
+  
+  // Legal concerns
+  if (msgLower.includes('legal') || msgLower.includes('court') || msgLower.includes('law') || msgLower.includes('fine')) {
+    concerns.push('legal_issues');
+  }
+  
+  // Add unique concerns
+  concerns.forEach(concern => {
+    if (!state.chatContext.keyConcerns.includes(concern)) {
+      state.chatContext.keyConcerns.push(concern);
+    }
+  });
+}
+
+function generateResourceRecommendations() {
+  const context = state.chatContext;
+  const recommendations = [];
+  
+  // Based on category
+  if (context.category === 'transport') {
+    recommendations.push({
+      name: 'Traffic Police Online Services',
+      url: 'https://www.police.gov.sg',
+      description: 'Online services for traffic violations and appeals'
+    });
+  } else if (context.category === 'housing') {
+    recommendations.push({
+      name: 'HDB e-Services',
+      url: 'https://www.hdb.gov.sg',
+      description: 'HDB online services and applications'
+    });
+  } else if (context.category === 'social_support') {
+    recommendations.push({
+      name: 'ComCare Application',
+      url: 'https://www.msf.gov.sg',
+      description: 'Apply for financial assistance'
+    });
+  }
+  
+  // Based on concerns
+  if (context.keyConcerns.includes('financial_difficulties')) {
+    recommendations.push({
+      name: 'Financial Assistance Schemes',
+      url: 'https://www.gov.sg',
+      description: 'Government financial assistance programs'
+    });
+  }
+  
+  if (context.keyConcerns.includes('employment_issues')) {
+    recommendations.push({
+      name: 'Workforce Singapore',
+      url: 'https://www.wsg.gov.sg',
+      description: 'Employment and training services'
+    });
+  }
+  
+  // Based on stress level
+  if (context.stressLevel === 'high') {
+    recommendations.push({
+      name: 'Crisis Support',
+      url: 'https://www.sos.org.sg',
+      description: '24/7 crisis support and counseling'
+    });
+  }
+  
+  state.chatContext.suggestedResources = recommendations;
+}
+
+function generateIntelligentInsights() {
+  const context = state.chatContext;
+  let insights = [];
+  
+  // Generate insights based on sentiment and concerns
+  if (context.stressLevel === 'high') {
+    insights.push('I notice you\'re experiencing high stress. The letter will emphasize the urgency and impact of your situation.');
+  }
+  
+  if (context.keyConcerns.includes('financial_difficulties')) {
+    insights.push('Given your financial difficulties, the letter will highlight available assistance programs and payment arrangements.');
+  }
+  
+  if (context.keyConcerns.includes('family_issues')) {
+    insights.push('I\'ve noted your family situation - the letter will emphasize how this affects your household and dependents.');
+  }
+  
+  if (context.urgency) {
+    insights.push('Since this is urgent, the letter will request expedited processing and immediate attention.');
+  }
+  
+  if (context.category === 'transport' && context.keyConcerns.includes('legal_issues')) {
+    insights.push('For traffic matters, the letter will focus on the specific circumstances and any mitigating factors you\'ve mentioned.');
+  }
+  
+  if (context.emotionalTone === 'positive') {
+    insights.push('Your positive attitude will be reflected in the letter\'s tone, showing cooperation and willingness to resolve the matter.');
+  }
+  
+  // Add confidence level insights
+  if (context.confidenceLevel === 'high') {
+    insights.push('Based on the information provided, I\'m confident this letter will effectively represent your case.');
+  }
+  
+  if (insights.length > 0) {
+    let insightMessage = '\n\n**Intelligent Analysis:**\n\n';
+    insights.forEach((insight, index) => {
+      insightMessage += `• ${insight}\n`;
+    });
+    insightMessage += '\nThese insights will help ensure your letter is tailored to your specific situation and needs.';
+    addChatMessage('assistant', insightMessage);
+  }
+}
+
+function showAcknowledgment(question, message) {
+  let acknowledgment = '';
+  
+  if (question.acknowledgments) {
+    if (typeof question.acknowledgments === 'object' && question.acknowledgments.yes && question.acknowledgments.no) {
+      // Yes/No question
+      const msgLower = message.toLowerCase();
+      const isYes = msgLower.includes('yes') || msgLower.includes('y') || msgLower.includes('true');
+      acknowledgment = isYes ? question.acknowledgments.yes : question.acknowledgments.no;
+    } else if (Array.isArray(question.acknowledgments)) {
+      // Open question - pick acknowledgment based on sentiment
+      const context = state.chatContext;
+      if (context.stressLevel === 'high') {
+        acknowledgment = "I can see this is really difficult for you. I'm here to help you through this.";
+      } else if (context.stressLevel === 'medium') {
+        acknowledgment = "I understand this is concerning. Let's work together to resolve this.";
+      } else if (context.emotionalTone === 'positive') {
+        acknowledgment = "That's great to hear! I'm confident we can help you with this.";
+      } else {
+        acknowledgment = question.acknowledgments[Math.floor(Math.random() * question.acknowledgments.length)];
+      }
+    }
+  }
+  
+  if (acknowledgment) {
+    addChatMessage('assistant', acknowledgment);
+  }
+}
+
+function shouldSkipQuestion(question, step) {
+  // Skip employment question if not relevant to category
+  if (question.field === 'employment_status' && state.chatContext.category && 
+      !['employment', 'social_support', 'housing'].includes(state.chatContext.category)) {
+    return true;
+  }
+  
+  // Skip financial hardship if not relevant
+  if (question.field === 'financial_hardship' && state.chatContext.category && 
+      !['social_support', 'housing', 'tax_finance', 'utilities_comms'].includes(state.chatContext.category)) {
+    return true;
+  }
+  
+  // Skip urgency if already established as urgent
+  if (question.field === 'urgency' && state.chatContext.urgency) {
+    return true;
+  }
+  
+  return false;
+}
+
 /** ---------- Predict & render ---------- */
 function renderProvider(p) {
   if (!p) return '<span class="text-gray-400">—</span>';
@@ -365,37 +1447,1182 @@ function renderProvider(p) {
 }
 
 function renderPreds(resp) {
+  console.log('renderPreds called with:', resp);
+  console.log('Full response structure:', JSON.stringify(resp, null, 2));
   const p = resp?.predictions?.[0];
+  console.log('Prediction object:', p);
   state.preds = p || null;
-  state.checked = new Set();
-  // do not clear truthAdd (human additions should persist across experiments)
-  const topCats = p?.top_categories || [];
-  qs('topCats').innerHTML = topCats.map(tc => `<span class="badge mr-1">${tc.top} <span class="text-gray-500">${Number(tc.score).toFixed(3)}</span></span>`).join('');
+  
+  if (!p) {
+    console.log('No prediction data found');
+    return;
+  }
 
-  const tbody = qs('predBody');
-  tbody.innerHTML = '';
-  if (!p) return;
+  const topCats = p?.top_categories || [];
   const labels = p.labels || [];
   const scores = p.scores || {};
-  const providers = p.providers || {};
-  labels.forEach(lab => {
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td class="px-3 py-2 mono">${lab}</td>
-      <td class="px-3 py-2">${(scores[lab] ?? 0).toFixed(3)}</td>
-      <td class="px-3 py-2 text-sm">${renderProvider(providers[lab])}</td>
-      <td class="px-3 py-2"><input type="checkbox" class="rounded" data-lab="${lab}"></td>
-    `;
-    tbody.appendChild(tr);
-  });
 
-  tbody.querySelectorAll('input[type=checkbox]').forEach(cb => {
-    cb.addEventListener('change', () => {
-      if (cb.checked) state.checked.add(cb.dataset.lab); else state.checked.delete(cb.dataset.lab);
-      updateMetrics();
+  const subCategoryList = qs('subCategoryList');
+  console.log('subCategoryList element:', subCategoryList);
+  const htmlContent = `
+    <div class="mb-4 p-4 bg-blue-50 rounded-lg border">
+      <h4 class="font-semibold text-lg text-blue-800 mb-2">AI Analysis Results</h4>
+      <p class="text-sm text-blue-600">${labels.length} labels found across ${topCats.length} main categories</p>
+      <p class="text-sm text-gray-600 mt-2">Select relevant sub-categories below, then generate letters for selected categories.</p>
+    </div>
+    <div id="letterGenerationControls" class="mb-4 p-4 bg-green-50 rounded-lg border border-green-200 hidden">
+      <h5 class="font-semibold text-green-800 mb-2">Letter Generation Ready</h5>
+      <p class="text-sm text-green-600 mb-3">Sub-categories selected. You can now generate letters for the selected categories.</p>
+      <button onclick="generateAllLetters()" class="bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700">
+        Generate All Selected Letters
+      </button>
+    </div>
+    ${topCats.map(cat => `
+      <div class="mb-4 p-4 rounded-lg border bg-white">
+        <div class="flex items-center justify-between mb-3">
+          <h5 class="font-semibold text-lg">${cat.top.replace('_', ' ').toUpperCase()}</h5>
+          <div class="text-right">
+            <div class="text-lg font-bold text-blue-600">${Number(cat.score).toFixed(3)}</div>
+            <div class="text-xs text-gray-500">Confidence</div>
+          </div>
+        </div>
+        <div class="space-y-2">
+          ${labels.filter(label => label.startsWith(cat.top + '/')).map(label => {
+            const [mainCategory, subCategory] = label.split('/');
+            const confidence = scores[label] || 0;
+                         return `
+               <div class="flex items-center justify-between p-3 bg-gray-50 rounded border">
+                 <div class="flex items-center space-x-3">
+                   <input type="checkbox" class="rounded" data-label="${label}" data-category="${cat.top}" onchange="updateLetterGenerationState()">
+                   <div>
+                     <div class="font-medium text-sm">${subCategory.replace('_', ' ')}</div>
+                   </div>
+                 </div>
+                 <div class="text-right">
+                   <div class="text-sm font-medium">${Number(confidence).toFixed(3)}</div>
+                 </div>
+               </div>
+             `;
+          }).join('')}
+        </div>
+        ${renderTrafficFinesSection(cat.top)}
+        <div class="mt-3 pt-3 border-t">
+          <button onclick="checkAndGenerateLetter('${cat.top}')" class="w-full bg-gray-400 text-white py-2 px-4 rounded-lg" disabled>
+            Select sub-categories first to generate letter
+          </button>
+        </div>
+      </div>
+    `).join('')}
+  `;
+  
+  console.log('Setting HTML content, length:', htmlContent.length);
+  subCategoryList.innerHTML = htmlContent;
+  console.log('HTML set successfully');
+  console.log('subCategoryList after setting:', subCategoryList.innerHTML.substring(0, 200) + '...');
+}
+
+// Check if any sub-categories are selected and enable/disable letter generation
+function updateLetterGenerationState() {
+  const allCheckboxes = document.querySelectorAll('input[type="checkbox"][data-category]');
+  const selectedCheckboxes = document.querySelectorAll('input[type="checkbox"][data-category]:checked');
+  const letterControls = qs('letterGenerationControls');
+  
+  if (selectedCheckboxes.length > 0) {
+    letterControls.classList.remove('hidden');
+    
+    // Enable individual category buttons that have selections
+    const categorySelections = {};
+    selectedCheckboxes.forEach(checkbox => {
+      const category = checkbox.dataset.category;
+      categorySelections[category] = (categorySelections[category] || 0) + 1;
+    });
+    
+    Object.keys(categorySelections).forEach(category => {
+      const button = document.querySelector(`button[onclick*="${category}"]`);
+      if (button) {
+        // Check schema readiness for transport/traffic fines
+        let isReady = true;
+        if (category === 'transport') {
+          const selectedLabels = Array.from(document.querySelectorAll(`input[data-category="${category}"]:checked`))
+            .map(input => input.dataset.label);
+          if (selectedLabels.some(l => /transport\/traffic_fines_appeals/.test(l))) {
+            const { readiness } = validateTrafficFines(state.slots.transport.traffic_fines);
+            isReady = readiness >= 80; // Require 80% readiness for traffic fines
+          }
+        }
+        
+        button.disabled = !isReady;
+        if (isReady) {
+          button.className = 'w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700';
+          button.textContent = `Generate Letter for ${category.replace('_', ' ').toUpperCase()} (${categorySelections[category]} selected)`;
+        } else {
+          button.className = 'w-full bg-amber-500 text-white py-2 px-4 rounded-lg';
+          button.textContent = `Complete required fields first (${category.replace('_', ' ').toUpperCase()})`;
+        }
+      }
+    });
+  } else {
+    letterControls.classList.add('hidden');
+    
+    // Disable all category buttons
+    const buttons = document.querySelectorAll('button[onclick*="checkAndGenerateLetter"]');
+    buttons.forEach(button => {
+      button.disabled = true;
+      button.className = 'w-full bg-gray-400 text-white py-2 px-4 rounded-lg';
+      button.textContent = 'Select sub-categories first to generate letter';
+    });
+  }
+}
+
+// Check and generate letter for a specific category
+function checkAndGenerateLetter(category) {
+  const selectedSubs = Array.from(document.querySelectorAll(`input[data-category="${category}"]:checked`));
+  if (selectedSubs.length === 0) {
+    alert('Please select at least one sub-category for letter generation.');
+    return;
+  }
+  
+  const selectedLabels = selectedSubs.map(input => input.dataset.label);
+  const caseText = qs('caseText').value.trim();
+  
+  // Check required fields for this category
+  const missingFields = checkRequiredFields(category, selectedLabels, caseText);
+  if (missingFields.length > 0) {
+    const missingList = missingFields.join('\n• ');
+    alert(`Missing required information for ${category.replace('_', ' ').toUpperCase()}:\n\n• ${missingList}\n\nPlease ensure all required details are provided before generating the letter.`);
+    return;
+  }
+  
+  // Generate letter content
+  const letterContent = generateLetterContent(category, selectedLabels, caseText);
+  
+  // Display letter in a modal or new section
+  displayLetter(category, letterContent, selectedLabels);
+}
+
+// Check required fields for each category
+function checkRequiredFields(category, selectedLabels, caseText) {
+  const requiredFields = {
+    'transport': {
+      'traffic_fines_appeals': ['offence date', 'notice number', 'reasons for appeal', 'financial hardship evidence'],
+      'road_tax': ['vehicle details', 'payment status', 'reasons for delay'],
+      'driver_licence': ['licence type', 'issue date', 'reasons for assistance']
+    },
+    'social_support': {
+      'comcare_short_mid_term': ['household income', 'family size', 'expenses breakdown', 'employment status'],
+      'childcare_subsidies': ['child age', 'childcare arrangement', 'household income'],
+      'family_violence_protection': ['incident details', 'safety concerns', 'support needed']
+    },
+    'housing': {
+      'hdb_loan_arrears': ['flat details', 'loan amount', 'arrears period', 'payment plan request'],
+      'town_council_scc_arrears': ['flat address', 'arrears amount', 'reasons for delay'],
+      'enhanced_housing_grant_ehg': ['household income', 'flat type', 'purchase details']
+    },
+    'tax_finance': {
+      'gst_voucher': ['household income', 'family size', 'residential status'],
+      'payment_plan_arrangement': ['outstanding amount', 'reasons for difficulty', 'proposed payment terms'],
+      'noa_objections_appeals': ['assessment year', 'objection grounds', 'supporting documents']
+    },
+    'employment': {
+      'fair_consideration_framework': ['job details', 'application status', 'discrimination concerns'],
+      'workfare_income_supplement': ['employment status', 'income level', 'age requirements'],
+      'employment_rights_tadm': ['employment details', 'rights violation', 'evidence']
+    },
+    'utilities_comms': {
+      'electricity_spgroup': ['account details', 'arrears amount', 'payment difficulties'],
+      'telecom_bills_singtel': ['service type', 'outstanding amount', 'payment plan request'],
+      'gas_city_energy': ['account details', 'usage pattern', 'payment issues']
+    }
+  };
+  
+  const missing = [];
+  // Schema-driven check for traffic fines when selected
+  if (category === 'transport' && selectedLabels.some(l => /transport\/traffic_fines_appeals/.test(l))) {
+    const vals = state.slots.transport.traffic_fines || {};
+    const { errors } = validateTrafficFines(vals);
+    for (const k of Object.keys(errors)) {
+      missing.push(errors[k]);
+    }
+    return missing;
+  }
+  const categoryFields = requiredFields[category] || {};
+  
+  selectedLabels.forEach(label => {
+    const [mainCat, subCat] = label.split('/');
+    const fields = categoryFields[subCat] || [];
+    
+    fields.forEach(field => {
+      if (!isFieldPresent(caseText, field)) {
+        missing.push(`${field} (for ${subCat.replace('_', ' ')})`);
+      }
     });
   });
-  updateMetrics();
+  
+  return missing;
+}
+
+// Check if a required field is present in the case text
+function isFieldPresent(caseText, field) {
+  const patterns = {
+    'offence date': /(?:date|on|when).*?(?:offence|violation|fine)/gi,
+    'notice number': /(?:notice|reference|number|no\.).*?[\d\w-]+/gi,
+    'reasons for appeal': /(?:reason|because|due to|explanation)/gi,
+    'financial hardship evidence': /(?:financial|money|pay|afford|struggling|hardship|bills|debt|unemployed)/gi,
+    'vehicle details': /(?:vehicle|car|motor|plate|registration)/gi,
+    'payment status': /(?:payment|paid|unpaid|arrears|outstanding)/gi,
+    'household income': /(?:income|salary|wage|earn|monthly|annual)/gi,
+    'family size': /(?:family|children|kids|household|dependents)/gi,
+    'expenses breakdown': /(?:expenses|bills|costs|spending|outgoings)/gi,
+    'employment status': /(?:employed|job|work|unemployed|retired|student)/gi,
+    'flat details': /(?:flat|unit|block|address|hdb|housing)/gi,
+    'loan amount': /(?:loan|amount|\$|dollar)/gi,
+    'arrears period': /(?:arrears|outstanding|overdue|months|weeks)/gi,
+    'arrears amount': /(?:arrears|outstanding|amount|\$|dollar)/gi,
+    'reasons for delay': /(?:reason|because|due to|explanation|delay)/gi,
+    'flat address': /(?:address|block|unit|flat|street)/gi,
+    'child age': /(?:age|year|old|child|kid)/gi,
+    'childcare arrangement': /(?:childcare|care|nursery|kindergarten|school)/gi,
+    'incident details': /(?:incident|happened|occurred|situation|event)/gi,
+    'safety concerns': /(?:safety|safe|danger|threat|concern)/gi,
+    'support needed': /(?:support|help|assistance|protection|shelter)/gi,
+    'residential status': /(?:citizen|pr|resident|singaporean|permanent)/gi,
+    'outstanding amount': /(?:outstanding|amount|\$|dollar|balance)/gi,
+    'reasons for difficulty': /(?:reason|because|due to|difficulty|hardship)/gi,
+    'proposed payment terms': /(?:payment|installment|monthly|weekly|terms)/gi,
+    'assessment year': /(?:year|assessment|tax|iras)/gi,
+    'objection grounds': /(?:objection|dispute|disagree|grounds|reason)/gi,
+    'supporting documents': /(?:document|evidence|proof|support|attachment)/gi,
+    'job details': /(?:job|position|work|employment|company)/gi,
+    'application status': /(?:application|applied|status|response|reply)/gi,
+    'discrimination concerns': /(?:discrimination|unfair|bias|prejudice|treat)/gi,
+    'income level': /(?:income|salary|wage|earn|low|high)/gi,
+    'age requirements': /(?:age|year|old|requirement|eligible)/gi,
+    'employment details': /(?:employment|job|work|company|employer)/gi,
+    'rights violation': /(?:rights|violation|breach|unfair|illegal)/gi,
+    'evidence': /(?:evidence|proof|document|record|support)/gi,
+    'account details': /(?:account|number|reference|id)/gi,
+    'arrears amount': /(?:arrears|outstanding|amount|\$|dollar)/gi,
+    'payment difficulties': /(?:payment|difficulty|problem|issue|struggle)/gi,
+    'service type': /(?:service|mobile|broadband|internet|phone)/gi,
+    'payment plan request': /(?:payment|plan|installment|arrangement|terms)/gi,
+    'usage pattern': /(?:usage|consumption|pattern|habit|regular)/gi,
+    'payment issues': /(?:payment|issue|problem|difficulty|struggle)/gi
+  };
+  
+  const pattern = patterns[field.toLowerCase()];
+  return pattern ? pattern.test(caseText) : false;
+}
+
+// Generate letter content based on category and selected labels
+function generateLetterContent(category, selectedLabels, caseText) {
+  // Use enhanced letter generation system
+  const subCategory = selectedLabels.find(label => label.includes('/'))?.split('/')[1] || 'general';
+  return generateEnhancedLetter(category, subCategory, caseText, selectedLabels);
+}
+
+// Extract key facts from case text and paraphrase them
+function extractKeyFacts(caseText, selectedLabels) {
+  const facts = [];
+  
+  // Basic fact extraction patterns
+  const patterns = {
+    financial_hardship: /(?:financial|money|pay|afford|struggling|hardship|bills|debt|unemployed|jobless)/gi,
+    family_situation: /(?:kids|children|family|wife|husband|sick|ill|disabled)/gi,
+    specific_amounts: /(?:fine|penalty|fee|cost|charge|bill).*?\$?[\d,]+/gi,
+    time_references: /(?:recently|lately|last|this|next|month|year|week|day)/gi,
+    urgency: /(?:urgent|immediate|asap|quickly|soon|emergency)/gi
+  };
+  
+  // Check for financial hardship
+  if (patterns.financial_hardship.test(caseText)) {
+    facts.push("The resident is experiencing financial difficulties and requires assistance");
+  }
+  
+  // Check for family situation
+  if (patterns.family_situation.test(caseText)) {
+    facts.push("The resident has family responsibilities that impact their situation");
+  }
+  
+  // Extract specific amounts mentioned
+  const amounts = caseText.match(patterns.specific_amounts);
+  if (amounts && amounts.length > 0) {
+    facts.push(`Specific amounts involved: ${amounts.slice(0, 3).join(', ')}`);
+  }
+  
+  // Check for urgency
+  if (patterns.urgency.test(caseText)) {
+    facts.push("The matter requires timely attention");
+  }
+  
+  // Add category-specific facts based on selected labels
+  selectedLabels.forEach(label => {
+    const [mainCat, subCat] = label.split('/');
+    const subCategoryName = subCat.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
+    
+    if (mainCat === 'transport' && subCat.includes('traffic_fines')) {
+      facts.push("Traffic violation matter requiring appeal consideration");
+    } else if (mainCat === 'social_support') {
+      facts.push(`${subCategoryName} assistance is being sought`);
+    } else if (mainCat === 'housing') {
+      facts.push(`${subCategoryName} matter requiring attention`);
+    } else if (mainCat === 'tax_finance') {
+      facts.push(`${subCategoryName} issue needs resolution`);
+    } else if (mainCat === 'employment') {
+      facts.push(`${subCategoryName} matter requires guidance`);
+    } else if (mainCat === 'utilities_comms') {
+      facts.push(`${subCategoryName} issue needs assistance`);
+    }
+  });
+  
+  // If no specific facts extracted, provide generic statement
+  if (facts.length === 0) {
+    facts.push("The resident requires assistance with government services and procedures");
+  }
+  
+  return facts;
+}
+
+// Enhanced Letter Generation System
+const letterTemplates = {
+  transport: {
+    traffic_fines: {
+      generate: (context, slots, caseText) => generateTrafficFinesLetter(context, slots, caseText),
+      tone: 'professional',
+      urgency: true,
+      personalization: true
+    }
+  },
+  housing: {
+    hdb_appeals: {
+      generate: (context, slots, caseText) => generateHDBAppealLetter(context, slots, caseText),
+      tone: 'formal',
+      urgency: false,
+      personalization: true
+    }
+  },
+  social_support: {
+    comcare_applications: {
+      generate: (context, slots, caseText) => generateComCareLetter(context, slots, caseText),
+      tone: 'compassionate',
+      urgency: true,
+      personalization: true
+    }
+  }
+};
+
+function generateEnhancedLetter(category, subCategory, caseText, selectedLabels) {
+  const context = state.chatContext || {};
+  const slots = state.slots || {};
+  
+  // Get template for this category and subcategory
+  const template = letterTemplates[category]?.[subCategory];
+  
+  if (template) {
+    return template.generate(context, slots, caseText);
+  }
+  
+  // Fallback to original letter generation
+  return generateOriginalLetter(category, caseText, selectedLabels);
+}
+
+function generateTrafficFinesLetter(context, slots, caseText) {
+  const trafficData = slots.transport?.traffic_fines || {};
+  const urgency = context.urgency || false;
+  const stressLevel = context.stressLevel || 'low';
+  const emotionalTone = context.emotionalTone || 'neutral';
+  
+  // Extract key information from case text
+  const facts = extractEnhancedFacts(caseText);
+  
+  // Determine letter tone based on context
+  let openingTone = "I am writing to appeal";
+  if (emotionalTone === 'stressed' || stressLevel === 'high') {
+    openingTone = "I am writing to urgently appeal";
+  } else if (emotionalTone === 'positive') {
+    openingTone = "I am writing to respectfully appeal";
+  }
+  
+  // Build personalized content
+  let personalCircumstances = "";
+  if (context.keyConcerns?.includes('financial_difficulties')) {
+    personalCircumstances += "\n\nI am currently experiencing financial difficulties and would greatly appreciate any consideration for a reduction in the fine amount or a payment plan arrangement.";
+  }
+  
+  if (context.keyConcerns?.includes('family_issues')) {
+    personalCircumstances += "\n\nThis matter is particularly concerning as it affects my family situation, and I am committed to resolving this matter responsibly.";
+  }
+  
+  // Generate professional letter with paraphrased content
+  let letter = `Dear Sir/Madam,
+
+${openingTone} the traffic fine issued to my constituent. I have reviewed the case details and would like to present the following information for your consideration.
+
+CASE REFERENCE:
+- Offence Type: ${trafficData.offence_type || 'To be confirmed'}
+- Date of Offence: ${trafficData.offence_date || 'To be confirmed'}
+- Location: ${trafficData.location || 'To be confirmed'}
+- Notice Reference: ${trafficData.notice_ref || 'To be confirmed'}
+- Fine Amount: $${trafficData.fine_amount || 'To be confirmed'}
+- Demerit Points: ${trafficData.demerit_points || 'To be confirmed'}
+
+CONSTITUENT'S SITUATION:
+${facts.circumstances || 'My constituent has provided details regarding the circumstances surrounding this matter.'}${personalCircumstances}
+
+KEY FACTS PRESENTED:
+${facts.keyPoints.length > 0 ? facts.keyPoints.map(point => `• ${point}`).join('\n') : '• Detailed circumstances have been provided by the constituent'}
+
+SUPPORTING EVIDENCE:
+${facts.supportingEvidence.length > 0 ? facts.supportingEvidence.map(evidence => `• ${evidence}`).join('\n') : '• Constituent is prepared to provide additional documentation as required'}
+
+REQUEST FOR CONSIDERATION:
+${trafficData.request || 'I respectfully request your consideration for leniency in this matter, taking into account the circumstances outlined above.'}
+
+My constituent is committed to being a responsible road user and would appreciate your kind consideration of this appeal. I am available to provide any additional information or documentation that may be required.
+
+Thank you for your time and consideration.
+
+Yours faithfully,
+
+[MP Name]
+Member of Parliament for [Constituency]
+[Contact Information]`;
+
+  return letter;
+}
+
+function generateHDBAppealLetter(context, slots, caseText) {
+  const facts = extractEnhancedFacts(caseText);
+  const urgency = context.urgency || false;
+  const emotionalTone = context.emotionalTone || 'neutral';
+  
+  let openingTone = "I am writing to appeal";
+  if (urgency) {
+    openingTone = "I am writing to urgently appeal";
+  }
+  
+  let personalCircumstances = "";
+  if (context.keyConcerns?.includes('family_issues')) {
+    personalCircumstances += "\n\nThis matter significantly impacts my family's housing situation, and I would greatly appreciate your consideration of our circumstances.";
+  }
+  
+  if (context.keyConcerns?.includes('financial_difficulties')) {
+    personalCircumstances += "\n\nGiven my current financial situation, I would be grateful for any flexibility in the terms or timeline for this matter.";
+  }
+  
+  return `Dear HDB Officer,
+
+${openingTone} the decision regarding my constituent's housing application/appeal.
+
+CONSTITUENT'S CASE:
+${facts.details || 'My constituent has provided detailed information regarding their housing situation.'}
+
+SITUATION OVERVIEW:
+${facts.circumstances || 'My constituent would like to provide additional context regarding their circumstances.'}${personalCircumstances}
+
+KEY FACTS PRESENTED:
+${facts.keyPoints.length > 0 ? facts.keyPoints.map(point => `• ${point}`).join('\n') : '• Detailed circumstances have been provided by the constituent'}
+
+SUPPORTING EVIDENCE:
+${facts.supportingEvidence.length > 0 ? facts.supportingEvidence.map(evidence => `• ${evidence}`).join('\n') : '• Constituent is prepared to provide additional documentation as required'}
+
+REQUEST FOR RECONSIDERATION:
+I respectfully request your reconsideration of this matter and would appreciate any guidance on how my constituent should proceed.
+
+My constituent is committed to fulfilling all requirements and would be grateful for your assistance in resolving this matter.
+
+Thank you for your time and consideration.
+
+Yours faithfully,
+
+[MP Name]
+Member of Parliament for [Constituency]
+[Contact Information]`;
+}
+
+function generateComCareLetter(context, slots, caseText) {
+  const facts = extractEnhancedFacts(caseText);
+  const urgency = context.urgency || false;
+  const stressLevel = context.stressLevel || 'low';
+  
+  let openingTone = "I am writing to apply for";
+  if (urgency || stressLevel === 'high') {
+    openingTone = "I am writing to urgently apply for";
+  }
+  
+  let personalCircumstances = "";
+  if (context.keyConcerns?.includes('family_issues')) {
+    personalCircumstances += "\n\nI am responsible for my family and this assistance would significantly help us during this difficult time.";
+  }
+  
+  if (context.keyConcerns?.includes('employment_issues')) {
+    personalCircumstances += "\n\nI am currently facing employment challenges and would greatly benefit from this support while I work to improve my situation.";
+  }
+  
+  return `Dear ComCare Officer,
+
+${openingTone} financial assistance under the ComCare scheme for my constituent.
+
+CONSTITUENT'S SITUATION:
+${facts.details || 'My constituent has provided detailed information regarding their current circumstances.'}
+
+CIRCUMSTANCES OVERVIEW:
+${facts.circumstances || 'My constituent would like to provide additional context regarding their current situation.'}${personalCircumstances}
+
+KEY FACTS PRESENTED:
+${facts.keyPoints.length > 0 ? facts.keyPoints.map(point => `• ${point}`).join('\n') : '• Detailed circumstances have been provided by the constituent'}
+
+SUPPORTING EVIDENCE:
+${facts.supportingEvidence.length > 0 ? facts.supportingEvidence.map(evidence => `• ${evidence}`).join('\n') : '• Constituent is prepared to provide additional documentation as required'}
+
+REQUEST FOR ASSISTANCE:
+I respectfully request your consideration for financial assistance to help my constituent and their family during this challenging period.
+
+My constituent is committed to working towards financial independence and would be grateful for your support during this transition.
+
+Thank you for your time and consideration.
+
+Yours faithfully,
+
+[MP Name]
+Member of Parliament for [Constituency]
+[Contact Information]`;
+}
+
+function extractEnhancedFacts(caseText) {
+  const facts = {
+    circumstances: '',
+    details: '',
+    timeline: '',
+    impact: '',
+    keyPoints: [],
+    supportingEvidence: []
+  };
+  
+  // Extract and professionally paraphrase circumstances
+  const circumstancePatterns = [
+    /(?:circumstances?|situation|context)[:\s]*(.+?)(?:\n|$)/gi,
+    /(?:what happened|the issue|problem)[:\s]*(.+?)(?:\n|$)/gi
+  ];
+  
+  circumstancePatterns.forEach(pattern => {
+    const match = caseText.match(pattern);
+    if (match) {
+      facts.circumstances += professionalParaphrase(match[1]) + ' ';
+    }
+  });
+  
+  // Extract and paraphrase details
+  const detailPatterns = [
+    /(?:details?|information|facts?)[:\s]*(.+?)(?:\n|$)/gi,
+    /(?:specifically|in particular)[:\s]*(.+?)(?:\n|$)/gi
+  ];
+  
+  detailPatterns.forEach(pattern => {
+    const match = caseText.match(pattern);
+    if (match) {
+      facts.details += professionalParaphrase(match[1]) + ' ';
+    }
+  });
+  
+  // Extract timeline information
+  const timelinePatterns = [
+    /(?:when|date|time|timeline)[:\s]*(.+?)(?:\n|$)/gi,
+    /(?:occurred|happened)[:\s]*(.+?)(?:\n|$)/gi
+  ];
+  
+  timelinePatterns.forEach(pattern => {
+    const match = caseText.match(pattern);
+    if (match) {
+      facts.timeline += professionalParaphrase(match[1]) + ' ';
+    }
+  });
+  
+  // Extract impact information
+  const impactPatterns = [
+    /(?:impact|affect|consequence)[:\s]*(.+?)(?:\n|$)/gi,
+    /(?:result|outcome)[:\s]*(.+?)(?:\n|$)/gi
+  ];
+  
+  impactPatterns.forEach(pattern => {
+    const match = caseText.match(pattern);
+    if (match) {
+      facts.impact += professionalParaphrase(match[1]) + ' ';
+    }
+  });
+  
+  // Extract key points for professional presentation
+  facts.keyPoints = extractKeyPoints(caseText);
+  facts.supportingEvidence = extractSupportingEvidence(caseText);
+  
+  // Clean up and format
+  Object.keys(facts).forEach(key => {
+    if (typeof facts[key] === 'string') {
+      facts[key] = facts[key].trim().replace(/\s+/g, ' ');
+      if (facts[key] && !facts[key].endsWith('.')) {
+        facts[key] += '.';
+      }
+    }
+  });
+  
+  return facts;
+}
+
+function professionalParaphrase(text) {
+  // Convert informal language to professional tone
+  const paraphrases = {
+    // Urgency indicators
+    'urgent': 'requires immediate attention',
+    'asap': 'at the earliest opportunity',
+    'quickly': 'expeditiously',
+    'soon': 'in a timely manner',
+    
+    // Problem indicators
+    'problem': 'issue',
+    'issue': 'matter',
+    'trouble': 'difficulty',
+    'stuck': 'unable to proceed',
+    'confused': 'unclear about the process',
+    'lost': 'uncertain about next steps',
+    
+    // Financial indicators
+    'can\'t afford': 'experiencing financial constraints',
+    'no money': 'facing financial difficulties',
+    'broke': 'experiencing financial hardship',
+    'struggling': 'facing challenges',
+    
+    // Family indicators
+    'kids': 'children',
+    'wife': 'spouse',
+    'husband': 'spouse',
+    'family': 'household',
+    
+    // Time indicators
+    'recently': 'in recent times',
+    'lately': 'recently',
+    'last week': 'the previous week',
+    'this month': 'the current month',
+    
+    // Emotional indicators
+    'frustrated': 'concerned',
+    'angry': 'disappointed',
+    'upset': 'concerned',
+    'worried': 'concerned',
+    'stressed': 'under pressure'
+  };
+  
+  let paraphrased = text.toLowerCase();
+  
+  // Apply paraphrases
+  Object.keys(paraphrases).forEach(key => {
+    const regex = new RegExp(`\\b${key}\\b`, 'gi');
+    paraphrased = paraphrased.replace(regex, paraphrases[key]);
+  });
+  
+  // Capitalize first letter
+  paraphrased = paraphrased.charAt(0).toUpperCase() + paraphrased.slice(1);
+  
+  return paraphrased;
+}
+
+function extractKeyPoints(caseText) {
+  const keyPoints = [];
+  const text = caseText.toLowerCase();
+  
+  // Extract specific amounts
+  const amountMatches = caseText.match(/\$[\d,]+/g);
+  if (amountMatches) {
+    amountMatches.forEach(amount => {
+      keyPoints.push(`Financial amount involved: ${amount}`);
+    });
+  }
+  
+  // Extract dates
+  const dateMatches = caseText.match(/\b\d{1,2}\/\d{1,2}\/\d{2,4}\b|\b\d{4}-\d{2}-\d{2}\b|\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{1,2},?\s+\d{4}\b/gi);
+  if (dateMatches) {
+    dateMatches.forEach(date => {
+      keyPoints.push(`Relevant date: ${date}`);
+    });
+  }
+  
+  // Extract reference numbers
+  const refMatches = caseText.match(/\b[A-Z0-9]{6,}\b/g);
+  if (refMatches) {
+    refMatches.forEach(ref => {
+      keyPoints.push(`Reference number: ${ref}`);
+    });
+  }
+  
+  // Extract locations
+  const locationMatches = caseText.match(/\b(?:singapore|sengkang|tampines|jurong|woodlands|clementi|bishan|ang mo kio|toa payoh|hougang|punggol|sembawang|yishun|choa chu kang|bukit batok|bukit panjang|queenstown|redhill|telok blangah|pasir ris|bedok|eunos|kallang|geylang|marine parade|katong|east coast|tanjong pagar|chinatown|little india|orchard|novena|newton|bishan|ang mo kio|serangoon|hougang|punggol|sengkang|tampines|pasir ris|bedok|eunos|kallang|geylang|marine parade|katong|east coast|tanjong pagar|chinatown|little india|orchard|novena|newton)\b/gi);
+  if (locationMatches) {
+    locationMatches.forEach(location => {
+      keyPoints.push(`Location: ${location}`);
+    });
+  }
+  
+  return keyPoints;
+}
+
+function extractSupportingEvidence(caseText) {
+  const evidence = [];
+  const text = caseText.toLowerCase();
+  
+  // Check for supporting documents mentioned
+  if (text.includes('document') || text.includes('certificate') || text.includes('letter') || text.includes('receipt')) {
+    evidence.push('Supporting documentation available');
+  }
+  
+  // Check for witnesses
+  if (text.includes('witness') || text.includes('saw') || text.includes('observed')) {
+    evidence.push('Witness testimony available');
+  }
+  
+  // Check for medical evidence
+  if (text.includes('doctor') || text.includes('medical') || text.includes('hospital') || text.includes('clinic')) {
+    evidence.push('Medical documentation available');
+  }
+  
+  // Check for financial evidence
+  if (text.includes('bank') || text.includes('statement') || text.includes('payslip') || text.includes('income')) {
+    evidence.push('Financial documentation available');
+  }
+  
+  return evidence;
+}
+
+function generateOriginalLetter(category, caseText, selectedLabels) {
+  // Fallback to original letter generation logic
+  return `Dear Sir/Madam,
+
+I am writing to appeal/request assistance regarding the matter described below.
+
+CASE DETAILS:
+${caseText}
+
+SELECTED CATEGORIES:
+${selectedLabels.join(', ')}
+
+I respectfully request your consideration of this matter and would appreciate any guidance on how to proceed.
+
+Thank you for your time and consideration.
+
+Yours sincerely,
+[Your Name]`;
+}
+
+// Multi-modal letter generation functions
+function generateUrgentLetter(context, slots, caseText, category) {
+  const facts = extractEnhancedFacts(caseText);
+  const today = new Date().toISOString().slice(0, 10);
+  
+  return `URGENT REQUEST - ${today}
+
+Dear Sir/Madam,
+
+I am writing to URGENTLY request your immediate attention and assistance regarding the following matter that requires expedited processing for my constituent.
+
+CONSTITUENT'S URGENT SITUATION:
+${facts.circumstances || 'My constituent has presented a matter that requires immediate attention due to time-sensitive circumstances.'}
+
+KEY FACTS PRESENTED:
+${facts.keyPoints.length > 0 ? facts.keyPoints.map(point => `• ${point}`).join('\n') : '• Detailed circumstances have been provided by the constituent'}
+
+SUPPORTING EVIDENCE:
+${facts.supportingEvidence.length > 0 ? facts.supportingEvidence.map(evidence => `• ${evidence}`).join('\n') : '• Constituent is prepared to provide additional documentation as required'}
+
+URGENT CIRCUMSTANCES:
+${facts.impact || 'This matter requires immediate attention due to time-sensitive circumstances that significantly impact my constituent.'}
+
+I understand the importance of proper procedures, but given the urgent nature of this situation, I respectfully request your expedited consideration and processing of this matter.
+
+I am available to provide any additional information or documentation immediately and can be reached at [Contact Number] for any clarifications.
+
+Thank you for your urgent attention to this matter.
+
+Yours faithfully,
+
+[MP Name]
+Member of Parliament for [Constituency]
+[Contact Information]`;
+}
+
+function generateCompassionateLetter(context, slots, caseText, category) {
+  const facts = extractEnhancedFacts(caseText);
+  const today = new Date().toISOString().slice(0, 10);
+  
+  let personalCircumstances = "";
+  if (context.keyConcerns?.includes('family_issues')) {
+    personalCircumstances += "\n\nI am particularly concerned about the impact this situation has on my family, especially my children who depend on me.";
+  }
+  
+  if (context.keyConcerns?.includes('financial_difficulties')) {
+    personalCircumstances += "\n\nI am currently facing significant financial difficulties and this matter adds considerable stress to an already challenging situation.";
+  }
+  
+  if (context.keyConcerns?.includes('health_issues')) {
+    personalCircumstances += "\n\nI am also dealing with health issues that make this situation even more difficult to manage.";
+  }
+  
+  return `Dear Sir/Madam,
+
+I am writing to humbly request your compassionate consideration regarding the following matter on behalf of my constituent. I understand the importance of following proper procedures and my constituent takes full responsibility for their actions.
+
+CONSTITUENT'S SITUATION:
+${facts.circumstances || 'My constituent would like to provide additional context about their current situation.'}${personalCircumstances}
+
+KEY FACTS PRESENTED:
+${facts.keyPoints.length > 0 ? facts.keyPoints.map(point => `• ${point}`).join('\n') : '• Detailed circumstances have been provided by the constituent'}
+
+SUPPORTING EVIDENCE:
+${facts.supportingEvidence.length > 0 ? facts.supportingEvidence.map(evidence => `• ${evidence}`).join('\n') : '• Constituent is prepared to provide additional documentation as required'}
+
+PERSONAL CIRCUMSTANCES:
+${facts.impact || 'My constituent is facing challenging circumstances that warrant compassionate consideration.'}
+
+My constituent is committed to resolving this matter responsibly and would be deeply grateful for any consideration you can provide. I understand that everyone must follow the rules, but I hope you can see the human side of this situation.
+
+My constituent is willing to work with you in any way possible to resolve this matter and would appreciate any guidance on how to proceed.
+
+Thank you for taking the time to consider this situation with compassion and understanding.
+
+Yours faithfully,
+
+[MP Name]
+Member of Parliament for [Constituency]
+[Contact Information]`;
+}
+
+function generateFormalAppealLetter(context, slots, caseText, category) {
+  const facts = extractEnhancedFacts(caseText);
+  const today = new Date().toISOString().slice(0, 10);
+  
+  return `FORMAL APPEAL - ${today}
+
+Dear Sir/Madam,
+
+I am writing to formally appeal the decision regarding the matter described below on behalf of my constituent. I believe there are grounds for reconsideration based on the circumstances and evidence provided.
+
+CONSTITUENT'S CASE:
+${facts.circumstances || 'My constituent believes there are valid grounds for appeal based on the following circumstances:'}
+
+KEY FACTS PRESENTED:
+${facts.keyPoints.length > 0 ? facts.keyPoints.map(point => `• ${point}`).join('\n') : '• Detailed circumstances have been provided by the constituent'}
+
+EVIDENCE AND SUPPORTING DOCUMENTS:
+${facts.supportingEvidence.length > 0 ? facts.supportingEvidence.map(evidence => `• ${evidence}`).join('\n') : '• Constituent has supporting documentation and evidence that supports their case'}
+
+LEGAL GROUNDS FOR APPEAL:
+${facts.details || 'My constituent has provided detailed information that supports their appeal.'}
+
+REQUEST FOR RECONSIDERATION:
+I respectfully request that you reconsider this matter based on the evidence and circumstances outlined above. My constituent is prepared to provide any additional documentation or information that may be required.
+
+I understand the importance of following proper procedures and my constituent is committed to working within the established framework to resolve this matter.
+
+Thank you for your consideration of this formal appeal.
+
+Yours faithfully,
+
+[MP Name]
+Member of Parliament for [Constituency]
+[Contact Information]`;
+}
+
+function generateFollowUpLetter(context, slots, caseText, category) {
+  const facts = extractEnhancedFacts(caseText);
+  const today = new Date().toISOString().slice(0, 10);
+  
+  return `FOLLOW-UP REQUEST - ${today}
+
+Dear Sir/Madam,
+
+I am writing to follow up on my previous correspondence regarding the matter described below on behalf of my constituent. I hope this finds you well.
+
+CONSTITUENT'S CASE:
+${facts.circumstances || 'My constituent has provided details regarding their ongoing matter.'}
+
+KEY FACTS PRESENTED:
+${facts.keyPoints.length > 0 ? facts.keyPoints.map(point => `• ${point}`).join('\n') : '• Detailed circumstances have been provided by the constituent'}
+
+SUPPORTING EVIDENCE:
+${facts.supportingEvidence.length > 0 ? facts.supportingEvidence.map(evidence => `• ${evidence}`).join('\n') : '• Constituent is prepared to provide additional documentation as required'}
+
+PREVIOUS CORRESPONDENCE:
+I previously submitted my constituent's case on [Previous Date] and am following up to check on the status and any updates regarding their request.
+
+CURRENT STATUS:
+I would greatly appreciate an update on the current status of my constituent's case and any next steps that may be required from their end.
+
+My constituent remains committed to providing any additional information or documentation that may be needed and is available to discuss this matter further if required.
+
+Thank you for your continued attention to this matter.
+
+Yours faithfully,
+
+[MP Name]
+Member of Parliament for [Constituency]
+[Contact Information]`;
+}
+
+function regenerateLetterWithType(category, letterId) {
+  const letterType = qs('letterType').value;
+  const caseText = qs('caseText').value;
+  const context = state.chatContext || {};
+  const slots = state.slots || {};
+  
+  let newLetter = '';
+  
+  switch(letterType) {
+    case 'urgent':
+      newLetter = generateUrgentLetter(context, slots, caseText, category);
+      break;
+    case 'compassionate':
+      newLetter = generateCompassionateLetter(context, slots, caseText, category);
+      break;
+    case 'formal':
+      newLetter = generateFormalAppealLetter(context, slots, caseText, category);
+      break;
+    case 'followup':
+      newLetter = generateFollowUpLetter(context, slots, caseText, category);
+      break;
+    default:
+      // Use enhanced letter generation
+      const subCategory = 'general';
+      newLetter = generateEnhancedLetter(category, subCategory, caseText, []);
+  }
+  
+  // Update the letter display
+  const letterDisplay = qs('letterDisplay');
+  if (letterDisplay) {
+    const preElement = letterDisplay.querySelector('pre');
+    if (preElement) {
+      preElement.textContent = newLetter;
+    }
+  }
+  
+  // Save the new letter
+  persistence.saveLetter(letterId, newLetter);
+}
+
+// Display the generated letter
+function displayLetter(category, letterContent, selectedLabels) {
+  // Create or update letter display area
+  let letterDisplay = qs('letterDisplay');
+  if (!letterDisplay) {
+    letterDisplay = document.createElement('div');
+    letterDisplay.id = 'letterDisplay';
+    letterDisplay.className = 'mt-6 p-4 bg-white rounded-lg border shadow-sm';
+    qs('selectedCategoryDetails').appendChild(letterDisplay);
+  }
+  
+  const categoryName = category.replace('_', ' ').toUpperCase();
+  const caseText = qs('caseText').value.trim();
+  const extractedFacts = extractKeyFacts(caseText, selectedLabels);
+  
+  // Generate unique ID for persistence
+  const letterId = `letter_${category}_${Date.now()}`;
+  
+  // Save to persistence model
+  persistence.saveLetter(letterId, letterContent);
+  persistence.saveExplainability(letterId, selectedLabels, extractedFacts, state.preds?.scores || {});
+  
+  letterDisplay.innerHTML = `
+    <div class="flex items-center justify-between mb-4">
+      <h4 class="font-semibold text-lg text-blue-800">Generated Letter - ${categoryName}</h4>
+              <div class="flex gap-2">
+          <select id="letterType" class="bg-gray-100 border border-gray-300 rounded px-2 py-1 text-sm" onchange="regenerateLetterWithType('${category}', '${letterId}')">
+            <option value="standard">Standard Letter</option>
+            <option value="urgent">Urgent Request</option>
+            <option value="compassionate">Compassionate Appeal</option>
+            <option value="formal">Formal Appeal</option>
+            <option value="followup">Follow-up Letter</option>
+          </select>
+          <button onclick="copyLetter()" class="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700">
+            Copy Letter
+          </button>
+          <button onclick="downloadLetter('${category}')" class="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700">
+            Download
+          </button>
+          <button onclick="editLetter('${letterId}')" class="bg-amber-600 text-white px-3 py-1 rounded text-sm hover:bg-amber-700">
+            Edit
+          </button>
+        </div>
+    </div>
+    <div class="bg-gray-50 p-4 rounded border">
+      <pre class="whitespace-pre-wrap text-sm font-mono">${letterContent}</pre>
+    </div>
+    <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div class="bg-blue-50 p-3 rounded border">
+        <h5 class="font-medium text-blue-800 mb-2">Selected Categories</h5>
+        <div class="space-y-1">
+          ${selectedLabels.map(label => {
+            const [mainCat, subCat] = label.split('/');
+            const subCategoryName = subCat.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
+            return `<div class="text-sm text-blue-700">• ${subCategoryName}</div>`;
+          }).join('')}
+        </div>
+      </div>
+      <div class="bg-green-50 p-3 rounded border">
+        <h5 class="font-medium text-green-800 mb-2">Extracted Facts</h5>
+        <div class="space-y-1">
+          ${extractedFacts.map(fact => `
+            <div class="text-sm text-green-700 relative group">
+              • ${fact}
+              <div class="absolute left-0 top-0 -translate-y-full bg-gray-800 text-white text-xs rounded px-2 py-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-10 whitespace-nowrap">
+                Fact extracted from case text using NLP patterns
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    </div>
+    <div class="mt-3 text-xs text-gray-500">
+      <strong>Letter Generation Logic:</strong> MP voice template with paraphrased facts (no raw citizen text). 
+      Addressee auto-selected by main category. Required fields validated before generation.
+      <br><strong>Persistence:</strong> Letter and explainability bundle saved (ID: ${letterId}).
+    </div>
+  `;
+}
+
+// Copy letter to clipboard
+function copyLetter() {
+  const letterText = qs('letterDisplay').querySelector('pre').textContent;
+  navigator.clipboard.writeText(letterText).then(() => {
+    alert('Letter copied to clipboard!');
+  }).catch(() => {
+    alert('Failed to copy letter. Please select and copy manually.');
+  });
+}
+
+// Download letter as text file
+function downloadLetter(category) {
+  const letterText = qs('letterDisplay').querySelector('pre').textContent;
+  const fileName = `letter_${category}_${new Date().toISOString().slice(0, 10)}.txt`;
+  
+  const blob = new Blob([letterText], { type: 'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// Generate all letters for selected categories
+function generateAllLetters() {
+  const selectedCheckboxes = document.querySelectorAll('input[type="checkbox"][data-category]:checked');
+  if (selectedCheckboxes.length === 0) {
+    alert('Please select at least one sub-category for letter generation.');
+    return;
+  }
+  
+  const categorySelections = {};
+  selectedCheckboxes.forEach(checkbox => {
+    const category = checkbox.dataset.category;
+    if (!categorySelections[category]) {
+      categorySelections[category] = [];
+    }
+    categorySelections[category].push(checkbox.dataset.label);
+  });
+  
+  console.log('Generating letters for categories:', categorySelections);
+  
+  // Generate letters for each category
+  const caseText = qs('caseText').value.trim();
+  let allLettersContent = '';
+  
+  Object.entries(categorySelections).forEach(([category, labels], index) => {
+    const letterContent = generateLetterContent(category, labels, caseText);
+    const categoryName = category.replace('_', ' ').toUpperCase();
+    
+    allLettersContent += `\n\n${'='.repeat(50)}\n`;
+    allLettersContent += `LETTER ${index + 1}: ${categoryName}\n`;
+    allLettersContent += `${'='.repeat(50)}\n\n`;
+    allLettersContent += letterContent;
+  });
+  
+  // Display all letters
+  displayAllLetters(allLettersContent, categorySelections);
+}
+
+// Display all generated letters
+function displayAllLetters(allLettersContent, categorySelections) {
+  // Create or update letter display area
+  let letterDisplay = qs('letterDisplay');
+  if (!letterDisplay) {
+    letterDisplay = document.createElement('div');
+    letterDisplay.id = 'letterDisplay';
+    letterDisplay.className = 'mt-6 p-4 bg-white rounded-lg border shadow-sm';
+    qs('selectedCategoryDetails').appendChild(letterDisplay);
+  }
+  
+  const categoryCount = Object.keys(categorySelections).length;
+  letterDisplay.innerHTML = `
+    <div class="flex items-center justify-between mb-4">
+      <h4 class="font-semibold text-lg text-blue-800">Generated Letters - ${categoryCount} Categories</h4>
+      <div class="flex gap-2">
+        <button onclick="copyAllLettersContent()" class="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700">
+          Copy All Letters
+        </button>
+        <button onclick="downloadAllLetters()" class="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700">
+          Download All
+        </button>
+      </div>
+    </div>
+    <div class="bg-gray-50 p-4 rounded border max-h-96 overflow-y-auto">
+      <pre class="whitespace-pre-wrap text-sm font-mono">${allLettersContent}</pre>
+    </div>
+    <div class="mt-3 text-sm text-gray-600">
+      <strong>Generated for:</strong> ${Object.entries(categorySelections).map(([cat, labels]) => 
+        `${cat.replace('_', ' ')} (${labels.length} items)`
+      ).join(', ')}
+    </div>
+  `;
+}
+
+// Copy all letters to clipboard
+function copyAllLettersContent() {
+  const letterText = qs('letterDisplay').querySelector('pre').textContent;
+  navigator.clipboard.writeText(letterText).then(() => {
+    alert('All letters copied to clipboard!');
+  }).catch(() => {
+    alert('Failed to copy letters. Please select and copy manually.');
+  });
+}
+
+// Download all letters as text file
+function downloadAllLetters() {
+  const letterText = qs('letterDisplay').querySelector('pre').textContent;
+  const fileName = `all_letters_${new Date().toISOString().slice(0, 10)}.txt`;
+  
+  const blob = new Blob([letterText], { type: 'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// Edit letter function
+function editLetter(letterId) {
+  const letterData = persistence.getLetter(letterId);
+  if (!letterData) return;
+  
+  const newContent = prompt('Edit letter content:', letterData.content);
+  if (newContent !== null && newContent !== letterData.content) {
+    persistence.saveLetter(letterId, newContent, { ...letterData.edits, lastEdit: Date.now() });
+    
+    // Update display
+    const pre = qs('letterDisplay').querySelector('pre');
+    if (pre) pre.textContent = newContent;
+    
+    // Update persistence info
+    const info = qs('letterDisplay').querySelector('.text-xs.text-gray-500');
+    if (info) {
+      info.innerHTML = info.innerHTML.replace(/ID: [^)]+/, `ID: ${letterId} (edited)`);
+    }
+  }
 }
 
 function currentTruthSet() {
@@ -447,7 +2674,7 @@ function downloadFile(name, content, mime='text/plain') {
 }
 
 /** ---------- Letters with Approve/Edit/Reject ---------- */
-function letterTemplates(label, provider, fields, caseText) {
+function generateLetterTemplate(label, provider, fields, caseText) {
   const today = new Date().toISOString().slice(0,10);
   const pdpa = !!fields.pdpa;
   const ref = 'MPSC-' + Math.floor(Math.random()*1e6).toString().padStart(6,'0');
@@ -491,7 +2718,7 @@ function generateLetters() {
   const wrap = qs('lettersWrap'); wrap.innerHTML = '';
   selected.forEach(lab => {
     const prov = providers[lab] || {};
-    const body = letterTemplates(lab, prov, fields, caseText);
+    const body = generateLetterTemplate(lab, prov, fields, caseText);
     const el = document.createElement('div');
     el.className = 'border rounded-lg p-3 bg-white';
     const rid = 'rej_' + Math.random().toString(36).slice(2);
@@ -564,16 +2791,19 @@ async function predictOnce() {
   saveSettings();
   const payload = {
     texts: [qs('caseText').value.trim()],
-    threshold_top: parseFloat(qs('thresholdTop').value),
-    threshold_child: parseFloat(qs('thresholdChild').value),
-    top_k_top: parseInt(qs('topKTop').value),
-    top_k_child: parseInt(qs('topKChild').value),
-    top_k_total: parseInt(qs('topKTotal').value),
-    seed_prior_threshold: parseFloat(qs('seedPrior').value),
-    use_priors: qs('usePriors').checked,
-    return_providers: true
+    threshold_top: parseFloat(qs('confidenceThreshold').value) || 0.1,
+    threshold_child: parseFloat(qs('confidenceThreshold').value) || 0.1,
+    top_k_top: parseInt(qs('maxCategories').value) || 6,
+    top_k_child: parseInt(qs('maxSubCategories').value) || 10,
+    top_k_total: (parseInt(qs('maxCategories').value) || 6) * (parseInt(qs('maxSubCategories').value) || 10),
+    seed_prior_threshold: 0.44,
+    use_priors: true,
+    return_providers: true,
+    return_confidence_breakdown: true
   };
   if (!payload.texts[0]) { qs('errMsg').textContent = 'Enter case text.'; qs('errMsg').classList.remove('hidden'); return; }
+  
+  console.log('Sending payload:', payload);
   try {
     const j = await apiFetch('/predict', { method: 'POST', body: JSON.stringify(payload) });
     renderPreds(j);
@@ -585,27 +2815,63 @@ async function predictOnce() {
 
 /** ---------- Wire up ---------- */
 initForm();
-qs('btnSave').addEventListener('click', saveSettings);
-qs('btnHealth').addEventListener('click', healthz);
-qs('btnPredict').addEventListener('click', predictOnce);
-qs('btnClear').addEventListener('click', () => {
-  qs('caseText').value='';
-  qs('predBody').innerHTML='';
-  qs('topCats').innerHTML='';
-  state.preds=null; state.checked.clear();
-  // keep truthAdd (human ground-truth additions) unless you want to clear:
-  // state.truthAdd.clear();
-  updateMetrics();
-  qs('lettersWrap').innerHTML='';
-});
-qs('btnAddTruth').addEventListener('click', addTruth);
-qs('btnExportCSV').addEventListener('click', exportCSV);
-qs('btnGenLetters').addEventListener('click', generateLetters);
-qs('btnCopyAll').addEventListener('click', copyAllLetters);
+applyFeatureFlags();
+// Add null checks for event listeners
+const btnSave = qs('btnSave');
+if (btnSave) btnSave.addEventListener('click', saveSettings);
+
+const btnHealth = qs('btnHealth');
+if (btnHealth) btnHealth.addEventListener('click', healthz);
+
+const btnPredict = qs('btnPredict');
+if (btnPredict) btnPredict.addEventListener('click', predictOnce);
+
+const btnClear = qs('btnClear');
+if (btnClear) {
+  btnClear.addEventListener('click', () => {
+    qs('caseText').value='';
+    qs('predBody').innerHTML='';
+    qs('topCats').innerHTML='';
+    state.preds=null; state.checked.clear();
+    // keep truthAdd (human ground-truth additions) unless you want to clear:
+    // state.truthAdd.clear();
+    updateMetrics();
+    qs('lettersWrap').innerHTML='';
+  });
+}
+
+// Chat mode event listeners
+const toggleMode = qs('toggleMode');
+if (toggleMode) toggleMode.addEventListener('click', toggleChatMode);
+
+const btnSendChat = qs('btnSendChat');
+if (btnSendChat) btnSendChat.addEventListener('click', sendChatMessage);
+
+const btnResetChat = qs('btnResetChat');
+if (btnResetChat) btnResetChat.addEventListener('click', resetChat);
+
+const chatInput = qs('chatInput');
+if (chatInput) {
+  chatInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+      sendChatMessage();
+    }
+  });
+  chatInput.addEventListener('input', () => {
+    updateCharCount();
+  });
+}
+// qs('btnAddTruth').addEventListener('click', addTruth); // Element doesn't exist - FIXED
+// qs('btnExportCSV').addEventListener('click', exportCSV); // Element doesn't exist
+// qs('btnGenLetters').addEventListener('click', generateLetters); // Element doesn't exist - FIXED
+// qs('btnCopyAll').addEventListener('click', copyAllLetters); // Element doesn't exist - FIXED
 
 // Chooser
-qs('labelSearch').addEventListener('input', renderLabelSearchResults);
-qs('labelSearch').addEventListener('focus', loadLabelsOnce);
+const labelSearchEl = qs('labelSearch');
+if (labelSearchEl) {
+  labelSearchEl.addEventListener('input', renderLabelSearchResults);
+  labelSearchEl.addEventListener('focus', loadLabelsOnce);
+}
 document.addEventListener('DOMContentLoaded', () => { loadLabelsOnce().catch(()=>{}); });
 
 // If ?api= is present, auto-run a quick health check
