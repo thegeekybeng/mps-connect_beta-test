@@ -15,6 +15,10 @@
     .btn-green { padding: 0.25rem 0.5rem; font-size: 0.875rem; border-radius: 0.25rem; background-color: #059669; color: white; }
     .btn-red { padding: 0.25rem 0.5rem; font-size: 0.875rem; border-radius: 0.25rem; background-color: #dc2626; color: white; }
     .btn-amber { padding: 0.25rem 0.5rem; font-size: 0.875rem; border-radius: 0.25rem; background-color: #f59e0b; color: white; }
+    .typing-dot-1 { animation-delay: 0s; }
+    .typing-dot-2 { animation-delay: 0.1s; }
+    .typing-dot-3 { animation-delay: 0.2s; }
+    .progress-bar { width: 0%; }
   </style>
 </head>
 <body class="bg-gray-50 text-gray-900">
@@ -102,7 +106,7 @@
               <span id="progressText">0 / 0</span>
             </div>
             <div class="w-full bg-gray-200 rounded-full h-2">
-              <div id="progressBar" class="bg-blue-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+              <div id="progressBar" class="bg-blue-600 h-2 rounded-full transition-all duration-300 progress-bar"></div>
             </div>
           </div>
         </div>
@@ -133,9 +137,9 @@
         <div id="typingIndicator" class="mt-2 hidden">
           <div class="flex items-center space-x-2 text-gray-500">
             <div class="flex space-x-1">
-              <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-              <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0.1s"></div>
-              <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0.2s"></div>
+              <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce typing-dot-1"></div>
+              <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce typing-dot-2"></div>
+              <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce typing-dot-3"></div>
             </div>
             <span class="text-xs">MPS Connect is typing...</span>
           </div>

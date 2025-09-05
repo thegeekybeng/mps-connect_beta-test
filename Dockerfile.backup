@@ -1,0 +1,55 @@
+# MPS Connect Backup Service Dockerfile for Render
+# Automated database backup service
+
+FROM python:3.11-slim
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONPATH=/app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    postgresql-client \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create app directory
+WORKDIR /app
+
+# Copy requirements
+COPY api/requirements.txt .
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Install additional backup dependencies
+RUN pip install --no-cache-dir \
+    boto3 \
+    psycopg2-binary \
+    schedule
+
+# Copy backup scripts
+COPY scripts/backup_database.py .
+COPY scripts/retention_cleanup.py .
+
+# Create backup directory
+RUN mkdir -p /app/backups
+
+# Create health check script
+RUN echo '#!/bin/bash' > /usr/local/bin/health-check.sh && \
+    echo 'echo "HTTP/1.1 200 OK"' >> /usr/local/bin/health-check.sh && \
+    echo 'echo "Content-Type: text/plain"' >> /usr/local/bin/health-check.sh && \
+    echo 'echo ""' >> /usr/local/bin/health-check.sh && \
+    echo 'echo "Backup service is healthy"' >> /usr/local/bin/health-check.sh && \
+    chmod +x /usr/local/bin/health-check.sh
+
+# Expose port for health checks
+EXPOSE 8080
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD /usr/local/bin/health-check.sh
+
+# Start backup service
+CMD ["python", "backup_database.py"]

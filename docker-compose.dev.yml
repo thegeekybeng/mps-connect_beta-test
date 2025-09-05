@@ -1,0 +1,209 @@
+# MPS Connect Development Docker Compose
+# Development environment with hot reloading and debugging
+
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: mps-connect-db-dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: mps_connect_dev
+      POSTGRES_USER: mps_user
+      POSTGRES_PASSWORD: dev_password
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+      - ./database/immutable_audit.sql:/docker-entrypoint-initdb.d/02-immutable-audit.sql
+    ports:
+      - "5433:5432"  # Different port to avoid conflicts
+    networks:
+      - mps-dev-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mps_user -d mps_connect_dev"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: mps-connect-redis-dev
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass dev_password
+    volumes:
+      - redis_dev_data:/data
+    ports:
+      - "6380:6379"  # Different port to avoid conflicts
+    networks:
+      - mps-dev-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # API Service (Development)
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: mps-connect-api-dev
+    restart: unless-stopped
+    environment:
+      # Database configuration
+      DATABASE_URL: postgresql://mps_user:dev_password@postgres:5432/mps_connect_dev
+      
+      # Security configuration (development keys - NOT for production)
+      SECRET_KEY: dev_secret_key_change_in_production
+      ENCRYPTION_KEY: dev_encryption_key_change_in_production
+      JWT_SECRET_KEY: dev_jwt_secret_key_change_in_production
+      
+      # Redis configuration
+      REDIS_URL: redis://:dev_password@redis:6379/0
+      
+      # Application configuration
+      ENVIRONMENT: development
+      LOG_LEVEL: DEBUG
+      CORS_ORIGINS: http://localhost:3000,http://localhost:5173,http://localhost:8080
+      
+      # Development features
+      ENABLE_DEBUG: true
+      ENABLE_RELOAD: true
+      ENABLE_METRICS: true
+      METRICS_PORT: 9090
+    ports:
+      - "8000:8000"
+      - "9090:9090"
+    networks:
+      - mps-dev-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - .:/app  # Mount source code for hot reloading
+      - ./logs:/app/logs
+      - ./data:/app/data
+    command: ["uvicorn", "api.app:app", "--host", "0.0.0.0", "--port", "8000", "--reload", "--log-level", "debug"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # Web Frontend (Development)
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    container_name: mps-connect-web-dev
+    restart: unless-stopped
+    environment:
+      API_URL: http://api:8000
+      ENVIRONMENT: development
+      VITE_API_URL: http://localhost:8000
+    ports:
+      - "3000:80"
+    networks:
+      - mps-dev-network
+    depends_on:
+      - api
+    volumes:
+      - .:/app  # Mount source code for hot reloading
+    command: ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "80"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Database Migration Service
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: mps-connect-migrate-dev
+    environment:
+      DATABASE_URL: postgresql://mps_user:dev_password@postgres:5432/mps_connect_dev
+    networks:
+      - mps-dev-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ["alembic", "upgrade", "head"]
+    restart: "no"
+    volumes:
+      - .:/app  # Mount source code
+
+  # Database Admin (pgAdmin)
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: mps-connect-pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@mps-connect.local
+      PGADMIN_DEFAULT_PASSWORD: admin_password
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    ports:
+      - "5050:80"
+    networks:
+      - mps-dev-network
+    depends_on:
+      - postgres
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/misc/ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Redis Admin (RedisInsight)
+  redisinsight:
+    image: redislabs/redisinsight:latest
+    container_name: mps-connect-redisinsight
+    restart: unless-stopped
+    ports:
+      - "8001:8001"
+    networks:
+      - mps-dev-network
+    depends_on:
+      - redis
+    volumes:
+      - redisinsight_data:/data
+
+  # Mailhog (Email testing)
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: mps-connect-mailhog
+    restart: unless-stopped
+    ports:
+      - "1025:1025"  # SMTP
+      - "8025:8025"  # Web UI
+    networks:
+      - mps-dev-network
+
+# Networks
+networks:
+  mps-dev-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.21.0.0/16
+
+# Volumes
+volumes:
+  postgres_dev_data:
+    driver: local
+  redis_dev_data:
+    driver: local
+  pgadmin_data:
+    driver: local
+  redisinsight_data:
+    driver: local

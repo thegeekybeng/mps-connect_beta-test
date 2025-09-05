@@ -1,0 +1,202 @@
+# MPS Connect Render Deployment Configuration
+# Production deployment for backend services and database
+
+services:
+  # PostgreSQL Database
+  - type: pserv
+    name: mps-connect-db
+    runtime: docker
+    plan: starter
+    region: oregon
+    dockerfilePath: ./Dockerfile.database
+    envVars:
+      - key: POSTGRES_DB
+        value: mps_connect
+      - key: POSTGRES_USER
+        value: mps_user
+      - key: POSTGRES_PASSWORD
+        generateValue: true
+      - key: POSTGRES_INITDB_ARGS
+        value: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+    healthCheckPath: /health
+    scaling:
+      minInstances: 1
+      maxInstances: 3
+    disk:
+      name: postgres-data
+      mountPath: /var/lib/postgresql/data
+      sizeGB: 10
+
+  # Redis Cache
+  - type: redis
+    name: mps-connect-redis
+    plan: starter
+    region: oregon
+    maxmemoryPolicy: allkeys-lru
+    ipAllowList: []
+
+  # FastAPI Backend
+  - type: web
+    name: mps-connect-api
+    runtime: docker
+    plan: starter
+    region: oregon
+    dockerfilePath: ./Dockerfile.api
+    buildCommand: echo "Building API service..."
+    startCommand: uvicorn api.app:app --host 0.0.0.0 --port $PORT --workers 4
+    healthCheckPath: /health
+    envVars:
+      # Database configuration
+      - key: DATABASE_URL
+        fromDatabase:
+          name: mps-connect-db
+          property: connectionString
+      - key: POSTGRES_DB
+        fromDatabase:
+          name: mps-connect-db
+          property: database
+      - key: POSTGRES_USER
+        fromDatabase:
+          name: mps-connect-db
+          property: user
+      - key: POSTGRES_PASSWORD
+        fromDatabase:
+          name: mps-connect-db
+          property: password
+      
+      # Redis configuration
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: mps-connect-redis
+          property: connectionString
+      
+      # Security configuration
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ENCRYPTION_KEY
+        generateValue: true
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      
+      # Application configuration
+      - key: ENVIRONMENT
+        value: production
+      - key: LOG_LEVEL
+        value: INFO
+      - key: CORS_ORIGINS
+        value: https://mps-connect.vercel.app,https://mps-connect-git-main.vercel.app
+      
+      # Performance configuration
+      - key: MAX_WORKERS
+        value: "4"
+      - key: WORKER_TIMEOUT
+        value: "30"
+      - key: KEEP_ALIVE_TIMEOUT
+        value: "5"
+      
+      # Security configuration
+      - key: RATE_LIMIT_PER_MINUTE
+        value: "100"
+      - key: RATE_LIMIT_BURST
+        value: "200"
+      - key: SESSION_TIMEOUT
+        value: "3600"
+      
+      # Audit configuration
+      - key: AUDIT_LOG_LEVEL
+        value: INFO
+      - key: AUDIT_LOG_RETENTION_DAYS
+        value: "730"
+      
+      # Compliance configuration
+      - key: COMPLIANCE_CHECK_INTERVAL
+        value: "3600"
+      - key: COMPLIANCE_REPORT_SCHEDULE
+        value: "0 0 * * 0"
+    
+    scaling:
+      minInstances: 1
+      maxInstances: 5
+      targetCPUPercent: 70
+      targetMemoryPercent: 80
+    
+    disk:
+      name: api-logs
+      mountPath: /app/logs
+      sizeGB: 5
+
+  # Database Migration Service
+  - type: cron
+    name: mps-connect-migrate
+    runtime: docker
+    plan: starter
+    region: oregon
+    dockerfilePath: ./Dockerfile.api
+    schedule: "0 2 * * *"  # Daily at 2 AM
+    buildCommand: echo "Building migration service..."
+    startCommand: alembic upgrade head
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: mps-connect-db
+          property: connectionString
+
+  # Backup Service
+  - type: cron
+    name: mps-connect-backup
+    runtime: docker
+    plan: starter
+    region: oregon
+    dockerfilePath: ./Dockerfile.backup
+    schedule: "0 3 * * *"  # Daily at 3 AM
+    buildCommand: echo "Building backup service..."
+    startCommand: python scripts/backup_database.py
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: mps-connect-db
+          property: connectionString
+      - key: BACKUP_S3_BUCKET
+        value: mps-connect-backups
+      - key: BACKUP_S3_REGION
+        value: us-east-1
+      - key: BACKUP_RETENTION_DAYS
+        value: "30"
+
+  # Monitoring Service
+  - type: web
+    name: mps-connect-monitor
+    runtime: docker
+    plan: starter
+    region: oregon
+    dockerfilePath: ./Dockerfile.monitor
+    buildCommand: echo "Building monitoring service..."
+    startCommand: python scripts/monitor_services.py
+    healthCheckPath: /health
+    envVars:
+      - key: API_URL
+        fromService:
+          type: web
+          name: mps-connect-api
+          property: host
+      - key: DATABASE_URL
+        fromDatabase:
+          name: mps-connect-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: mps-connect-redis
+          property: connectionString
+      - key: MONITOR_INTERVAL
+        value: "300"  # 5 minutes
+      - key: ALERT_EMAIL
+        value: admin@mps-connect.local
+
+databases:
+  - name: mps-connect-db
+    plan: starter
+    region: oregon
+    databaseName: mps_connect
+    user: mps_user

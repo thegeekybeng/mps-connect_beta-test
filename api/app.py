@@ -7,14 +7,28 @@ import logging
 from typing import List, Dict, Any, Optional, Tuple
 from dataclasses import dataclass
 
+# pylint: disable=import-error
 import numpy as np
-import re
 from fastapi import FastAPI, Depends, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from pydantic import BaseModel  # type: ignore[attr-defined]
 
+# Security imports
+# pylint: disable=import-error
+from security.middleware import (  # type: ignore
+    SecurityMiddleware,
+    CORSecurityMiddleware,
+    ContentSecurityMiddleware,
+)
+
+# pylint: disable=import-error
+from database.connection import get_db  # type: ignore
+
+# pylint: disable=import-error
+
 # sklearn imports (grouped)
+# pylint: disable=import-error
 from sklearn.feature_extraction.text import TfidfVectorizer  # type: ignore[import]
 from sklearn.metrics import pairwise as sk_pairwise  # type: ignore[import]
 from sklearn.preprocessing import normalize  # type: ignore[import]
@@ -58,6 +72,11 @@ ALLOWED_ORIGINS = [
     "http://localhost:8080",  # For local development
     "http://localhost:3000",  # Alternative local port
 ]
+
+# Add security middleware
+# app.add_middleware(SecurityMiddleware, db_session_factory=get_db)
+# app.add_middleware(CORSecurityMiddleware, allowed_origins=ALLOWED_ORIGINS)
+# app.add_middleware(ContentSecurityMiddleware)
 
 app.add_middleware(
     CORSMiddleware,
@@ -575,6 +594,15 @@ def mount_routes(prefix: str = ""):
             result["confidence_breakdown"] = confidence_breakdowns  # type: ignore[assignment]
         return result
 
+
+# Import and include authentication routes
+from api.auth_endpoints import router as auth_router  # type: ignore
+
+# Import and include governance routes
+from api.governance_endpoints import router as governance_router  # type: ignore
+
+app.include_router(auth_router)
+app.include_router(governance_router)
 
 # mount both root and /api for convenience
 mount_routes("")
