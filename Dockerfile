@@ -1,21 +1,41 @@
 FROM python:3.11-slim
-ARG CACHE_BUST=4
+ARG CACHE_BUST=5
 
 WORKDIR /app
 
+# Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential curl && rm -rf /var/lib/apt/lists/*
+    build-essential \
+    curl \
+    gcc \
+    g++ \
+    && rm -rf /var/lib/apt/lists/*
 
+# Copy requirements and install Python dependencies
 COPY api/requirements.txt /app/requirements.txt
-RUN pip install -r /app/requirements.txt
+RUN pip install --no-cache-dir -r /app/requirements.txt
 
-COPY api/app.py /app/app.py
-COPY api/artifacts_zs_hier_plus /app/artifacts_zs_hier_plus
-COPY api/providers_map.json /app/providers_map.json
+# Copy application code
+COPY api/ /app/api/
+COPY database/ /app/database/
+COPY security/ /app/security/
+COPY governance/ /app/governance/
+COPY alembic/ /app/alembic/
+COPY alembic.ini /app/
 
-# Copy SSL certs
-COPY api/certs /app/certs
+# Create necessary directories
+RUN mkdir -p /app/logs /app/data
 
+# Set environment variables
+ENV PYTHONPATH=/app
+ENV PYTHONUNBUFFERED=1
+
+# Expose port (Render will set PORT environment variable)
 EXPOSE 8000
 
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8000/healthz || exit 1
+
+# Start command (Render will override with PORT env var)
+CMD ["uvicorn", "api.app:app", "--host", "0.0.0.0", "--port", "8000"]

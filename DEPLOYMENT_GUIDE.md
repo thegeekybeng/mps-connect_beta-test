@@ -4,6 +4,8 @@
 
 This guide covers deploying MPS Connect to Render (backend + database) and Vercel (frontend) for production demo.
 
+For detailed Render configuration, see [RENDER_DEPLOYMENT.md](./RENDER_DEPLOYMENT.md).
+
 ## Prerequisites
 
 - GitHub repository with MPS Connect code
@@ -69,13 +71,23 @@ PostgreSQL is a powerful relational database that provides:
    - Create new Web Service
    - Connect GitHub repository
    - Choose "Free" plan
-   - Build Command: `pip install -r api/requirements.txt && python scripts/init_database.py`
-   - Start Command: `uvicorn api.app:app --host 0.0.0.0 --port $PORT`
+   - **Docker Build Context Directory**: `.` (root of repository)
+   - **Dockerfile Path**: `./Dockerfile`
+   - **Docker Command**: `uvicorn api.app:app --host 0.0.0.0 --port $PORT`
+   - **Pre-Deploy Command**: `bash scripts/render_deploy.sh`
+   - **Auto-Deploy**: `On Commit`
+   - **Build Filters**: Include paths: `api/**`, `database/**`, `security/**`, `governance/**`, `alembic/**`, `scripts/**`, `requirements.txt`, `Dockerfile`, `alembic.ini`
    - Environment Variables:
      - `DATABASE_URL`: (from PostgreSQL service)
      - `MODEL_DIR`: `./api/artifacts_zs_hier_plus`
      - `PROVIDERS_JSON`: `./api/providers_map.json`
      - `API_KEY`: `mps-85-whampoa`
+     - `SECRET_KEY`: (generate random string)
+     - `ENCRYPTION_KEY`: (generate random string)
+     - `JWT_SECRET_KEY`: (generate random string)
+     - `ENVIRONMENT`: `production`
+     - `LOG_LEVEL`: `INFO`
+     - `CORS_ORIGINS`: `https://your-frontend.vercel.app`
 
 ### Step 2: Vercel Frontend Setup
 
