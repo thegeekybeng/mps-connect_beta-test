@@ -150,7 +150,7 @@ class Letter(Base):
     reviewed_at = Column(DateTime(timezone=True))
     approved_at = Column(DateTime(timezone=True))
     sent_at = Column(DateTime(timezone=True))
-    metadata = Column(JSONB)
+    letter_metadata = Column(JSONB)
 
     # Relationships
     case = relationship("Case", back_populates="letters")
