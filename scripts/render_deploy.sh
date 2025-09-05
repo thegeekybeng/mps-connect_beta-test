@@ -6,12 +6,11 @@ set -e
 
 echo "Starting MPS Connect deployment..."
 
-# Check if DATABASE_URL is set
+# Check if DATABASE_URL is set, use fallback if not
 if [ -z "$DATABASE_URL" ]; then
-    echo "WARNING: DATABASE_URL not set. Skipping database operations."
-    echo "Please create a PostgreSQL database service and set DATABASE_URL environment variable."
-    echo "Deployment will continue without database initialization."
-    exit 0
+    echo "DATABASE_URL not set, using fallback database connection..."
+    export DATABASE_URL="postgresql://mpsconnect:HCAQ6lIVxFMiBChi5AvB2VsdEWa3S6rJ@dpg-d2tatifdiees7383eh2g-a.singapore-postgres.render.com/mpsconnect"
+    echo "Using fallback DATABASE_URL: $DATABASE_URL"
 fi
 
 # Wait for database to be ready
