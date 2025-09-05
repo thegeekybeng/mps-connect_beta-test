@@ -6,6 +6,14 @@ set -e
 
 echo "Starting MPS Connect deployment..."
 
+# Check if DATABASE_URL is set
+if [ -z "$DATABASE_URL" ]; then
+    echo "WARNING: DATABASE_URL not set. Skipping database operations."
+    echo "Please create a PostgreSQL database service and set DATABASE_URL environment variable."
+    echo "Deployment will continue without database initialization."
+    exit 0
+fi
+
 # Wait for database to be ready
 echo "Waiting for database connection..."
 python -c "
