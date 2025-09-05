@@ -99,8 +99,8 @@ authenticate_render() {
         log_info "export RENDER_API_KEY=your_api_key_here"
         exit 1
     fi
-    
-    # Test authentication
+    # Login non-interactively using API key, then test authentication
+    render login --api-key "$RENDER_API_KEY" > /dev/null 2>&1 || true
     if render auth whoami > /dev/null 2>&1; then
         log_success "Render authentication successful"
     else
@@ -165,7 +165,7 @@ check_deployment_status() {
         log_info "API service URL: $API_URL"
         
         # Test API health
-        if curl -f "$API_URL/health" > /dev/null 2>&1; then
+        if curl -f "$API_URL/healthz" > /dev/null 2>&1; then
             log_success "API service is healthy"
         else
             log_warning "API service health check failed"

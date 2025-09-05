@@ -2,31 +2,6 @@
 # Production deployment for backend services and database
 
 services:
-  # PostgreSQL Database
-  - type: pserv
-    name: mps-connect-db
-    runtime: docker
-    plan: starter
-    region: oregon
-    dockerfilePath: ./Dockerfile.database
-    envVars:
-      - key: POSTGRES_DB
-        value: mps_connect
-      - key: POSTGRES_USER
-        value: mps_user
-      - key: POSTGRES_PASSWORD
-        generateValue: true
-      - key: POSTGRES_INITDB_ARGS
-        value: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
-    healthCheckPath: /health
-    scaling:
-      minInstances: 1
-      maxInstances: 3
-    disk:
-      name: postgres-data
-      mountPath: /var/lib/postgresql/data
-      sizeGB: 10
-
   # Redis Cache
   - type: redis
     name: mps-connect-redis
@@ -42,9 +17,6 @@ services:
     plan: starter
     region: oregon
     dockerfilePath: ./Dockerfile
-    buildCommand: pip install -r api/requirements.txt
-    startCommand: uvicorn api.app:app --host 0.0.0.0 --port $PORT
-    preDeployCommand: bash scripts/render_deploy.sh
     healthCheckPath: /healthz
     autoDeploy: true
     buildFilter:
@@ -99,6 +71,12 @@ services:
         value: INFO
       - key: CORS_ORIGINS
         value: https://mps-connect.vercel.app,https://mps-connect-git-main.vercel.app
+
+      # Model/artifacts configuration
+      - key: MODEL_DIR
+        value: ./api/artifacts_zs_hier_plus
+      - key: PROVIDERS_JSON
+        value: ./api/providers_map.json
       
       # Performance configuration
       - key: MAX_WORKERS

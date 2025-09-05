@@ -69,6 +69,8 @@ services:
       ENVIRONMENT: development
       LOG_LEVEL: DEBUG
       CORS_ORIGINS: http://localhost:3000,http://localhost:5173,http://localhost:8080
+      MODEL_DIR: ./api/artifacts_zs_hier_plus
+      PROVIDERS_JSON: ./api/providers_map.json
       
       # Development features
       ENABLE_DEBUG: true

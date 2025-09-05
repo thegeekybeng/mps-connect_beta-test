@@ -17,7 +17,7 @@
     },
     {
       "src": "/health",
-      "dest": "https://mps-connect-api.onrender.com/health"
+      "dest": "https://mps-connect-api.onrender.com/healthz"
     },
     {
       "src": "/(.*)",

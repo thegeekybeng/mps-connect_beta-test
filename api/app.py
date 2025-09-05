@@ -71,6 +71,8 @@ ALLOWED_ORIGINS = [
     "https://api.mpsconnect.thegeekybeng.com",  # api url
     "http://localhost:8080",  # For local development
     "http://localhost:3000",  # Alternative local port
+    "https://mps-connect.vercel.app",
+    "https://mps-connect-git-main.vercel.app",
 ]
 
 # Add security middleware

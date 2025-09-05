@@ -6,11 +6,10 @@ set -e
 
 echo "Starting MPS Connect deployment..."
 
-# Check if DATABASE_URL is set, use fallback if not
+# Require DATABASE_URL to be provided by the environment (e.g., Render binding)
 if [ -z "$DATABASE_URL" ]; then
-    echo "DATABASE_URL not set, using fallback database connection..."
-    export DATABASE_URL="postgresql://mpsconnect:HCAQ6lIVxFMiBChi5AvB2VsdEWa3S6rJ@dpg-d2tatifdiees7383eh2g-a.singapore-postgres.render.com/mpsconnect"
-    echo "Using fallback DATABASE_URL: $DATABASE_URL"
+    echo "DATABASE_URL is not set. Please configure your managed database and environment binding."
+    exit 1
 fi
 
 # Wait for database to be ready
