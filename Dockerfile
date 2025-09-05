@@ -21,10 +21,14 @@ COPY database/ /app/database/
 COPY security/ /app/security/
 COPY governance/ /app/governance/
 COPY alembic/ /app/alembic/
+COPY scripts/ /app/scripts/
 COPY alembic.ini /app/
 
 # Create necessary directories
 RUN mkdir -p /app/logs /app/data
+
+# Make scripts executable
+RUN chmod +x /app/scripts/*.sh
 
 # Set environment variables
 ENV PYTHONPATH=/app
