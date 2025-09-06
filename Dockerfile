@@ -35,11 +35,11 @@ ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
 
 # Expose port (Render will set PORT environment variable)
-EXPOSE 8000
+EXPOSE 10000
 
-# Health check uses PORT if valid, defaults to 8000 otherwise
+# Health check uses PORT if valid, defaults to 10000 otherwise
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD sh -c 'PORT_CLEAN=$(echo "${PORT:-8000}" | grep -Eo "^[0-9]+$"); if [ -z "$PORT_CLEAN" ]; then PORT_CLEAN=8000; fi; curl -f http://localhost:${PORT_CLEAN}/healthz || exit 1'
+    CMD sh -c 'PORT_CLEAN=$(echo "${PORT:-10000}" | grep -Eo "[0-9]+" | tail -n1); if [ -z "$PORT_CLEAN" ]; then PORT_CLEAN=10000; fi; curl -f http://localhost:${PORT_CLEAN}/healthz || exit 1'
 
-# Start command via entrypoint script that sanitizes PORT
-CMD ["/app/scripts/start.sh"]
+# Start application via Python module that sanitizes PORT internally
+CMD ["python", "-m", "api.app"]
