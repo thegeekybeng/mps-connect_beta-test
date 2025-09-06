@@ -1,8 +1,0 @@
-{
-  "version": 2,
-  "rewrites": [
-    { "source": "/api/(.*)", "destination": "https://mps-connect-api.onrender.com/api/$1" },
-    { "source": "/health", "destination": "https://mps-connect-api.onrender.com/healthz" },
-    { "source": "/(.*)", "destination": "/index.html" }
-  ]
-}

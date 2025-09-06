@@ -12,6 +12,23 @@ if [ -z "$DATABASE_URL" ]; then
     exit 1
 fi
 
+# Debug (safe) print of DB connection parameters (no password)
+python - <<'PYDBG'
+import os
+from urllib.parse import urlparse
+
+u = os.environ.get('DATABASE_URL','')
+try:
+    p = urlparse(u)
+    host = p.hostname or ''
+    is_internal = '.' not in (host or '')
+    print("[DB DEBUG] scheme=%s user=%s host=%s port=%s db=%s internal=%s" % (
+        p.scheme or '', p.username or '', host, p.port or '', (p.path or '')[1:], is_internal
+    ))
+except Exception as e:
+    print(f"[DB DEBUG] Failed to parse DATABASE_URL: {e}")
+PYDBG
+
 # Wait for database to be ready
 echo "Waiting for database connection..."
 python -c "
