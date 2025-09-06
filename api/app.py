@@ -56,24 +56,34 @@ uvicorn_access_logger = logging.getLogger("uvicorn.access")
 uvicorn_access_logger.setLevel(logging.INFO)
 
 # ------------------ CONFIG ------------------
-API_KEY = "mps-85-whampoa"  # header: X-API-Key
+API_KEY = os.environ.get("API_KEY", "mps-85-whampoa")  # header: X-API-Key
 MODEL_DIR = os.environ.get("MODEL_DIR", "./artifacts_zs_hier_plus")
 PROVIDERS_JSON = os.environ.get("PROVIDERS_JSON", "./providers_map.json")
 
 # ------------------ APP ---------------------
 app = FastAPI()
 
-ALLOWED_ORIGINS = [
-    "http://mpsconnect.thegeekybeng.com",  # actual url
+def _parse_cors(origins_env: Optional[str]) -> list[str]:
+    if not origins_env:
+        return []
+    return [o.strip() for o in origins_env.split(",") if o.strip()]
+
+
+DEFAULT_ALLOWED_ORIGINS = [
+    "http://mpsconnect.thegeekybeng.com",
     "https://thegeekybeng.github.io",
-    "https://thegeekybeng.github.io/mps-connect_testers",  # github repo url
-    "https://thegeekybeng.github.io/mps-connect_beta-test/",  # actual github page url
-    "https://api.mpsconnect.thegeekybeng.com",  # api url
-    "http://localhost:8080",  # For local development
-    "http://localhost:3000",  # Alternative local port
+    "https://thegeekybeng.github.io/mps-connect_testers",
+    "https://thegeekybeng.github.io/mps-connect_beta-test/",
+    "https://api.mpsconnect.thegeekybeng.com",
+    "http://localhost:8080",
+    "http://localhost:3000",
     "https://mps-connect.vercel.app",
     "https://mps-connect-git-main.vercel.app",
 ]
+
+# Allow overriding via CORS_ORIGINS env (comma-separated)
+ALLOWED_ORIGINS_ENV = os.environ.get("CORS_ORIGINS")
+ALLOWED_ORIGINS = _parse_cors(ALLOWED_ORIGINS_ENV) or DEFAULT_ALLOWED_ORIGINS
 
 # Add security middleware
 # app.add_middleware(SecurityMiddleware, db_session_factory=get_db)
