@@ -37,9 +37,9 @@ ENV PYTHONUNBUFFERED=1
 # Expose port (Render will set PORT environment variable)
 EXPOSE 8000
 
-# Health check respects PORT if provided (sanitize to integer)
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD sh -c 'PORT_CLEAN=${PORT%%.*}; if [ -z "$PORT_CLEAN" ]; then PORT_CLEAN=8000; fi; curl -f http://localhost:${PORT_CLEAN}/healthz || exit 1'
+# Health check uses PORT if valid, defaults to 8000 otherwise
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \    
+    CMD sh -c 'PORT_CLEAN=$(echo "${PORT:-8000}" | grep -Eo "^[0-9]+$"); if [ -z "$PORT_CLEAN" ]; then PORT_CLEAN=8000; fi; curl -f http://localhost:${PORT_CLEAN}/healthz || exit 1'
 
 # Start command via entrypoint script that sanitizes PORT
 CMD ["/app/scripts/start.sh"]
