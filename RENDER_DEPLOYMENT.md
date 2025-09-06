@@ -8,7 +8,8 @@ When creating a new web service on Render, use these settings:
 
 - **Docker Build Context Directory**: `.` (root of repository)
 - **Dockerfile Path**: `./Dockerfile`
-- **Docker Command**: `uvicorn api.app:app --host 0.0.0.0 --port $PORT`
+- **Docker Command**: `python -m api.app`
+  *Note*: `api.app` sanitizes Render's auto-generated `PORT` value before starting the server.
 - **Pre-Deploy Command**: `bash scripts/render_deploy.sh`
 - **Auto-Deploy**: `On Commit`
 - **Build Filters**: Include these paths:
