@@ -107,7 +107,5 @@
       "VITE_API_URL": "https://mps-connect-api.onrender.com"
     }
   },
-  "deployment": {
-    "regions": ["iad1", "sfo1", "lhr1", "hnd1"]
-  }
+  
 }
