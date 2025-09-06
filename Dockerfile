@@ -41,6 +41,5 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD sh -c 'PORT_CLEAN=${PORT%%.*}; if [ -z "$PORT_CLEAN" ]; then PORT_CLEAN=8000; fi; curl -f http://localhost:${PORT_CLEAN}/healthz || exit 1'
 
-# Start command that respects Render's PORT variable
-# Sanitize PORT to be an integer in case it's provided like "10000." or "10000.0"
-CMD ["sh", "-c", "PORT_CLEAN=${PORT%%.*}; if [ -z \"$PORT_CLEAN\" ]; then PORT_CLEAN=8000; fi; exec uvicorn api.app:app --host 0.0.0.0 --port ${PORT_CLEAN}"]
+# Start command via entrypoint script that sanitizes PORT
+CMD ["/app/scripts/start.sh"]
