@@ -38,7 +38,11 @@ ENV PYTHONUNBUFFERED=1
 EXPOSE 8000
 
 # Health check uses PORT if valid, defaults to 8000 otherwise
+<<<<<<< HEAD
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+=======
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \    
+>>>>>>> 639baa7 (removing the start.sh script to try out another way.)
     CMD sh -c 'PORT_CLEAN=$(echo "${PORT:-8000}" | grep -Eo "^[0-9]+$"); if [ -z "$PORT_CLEAN" ]; then PORT_CLEAN=8000; fi; curl -f http://localhost:${PORT_CLEAN}/healthz || exit 1'
 
 # Start command via entrypoint script that sanitizes PORT
