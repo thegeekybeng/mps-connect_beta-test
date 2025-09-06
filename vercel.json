@@ -30,11 +30,6 @@
     "VITE_APP_VERSION": "1.0.0",
     "VITE_ENVIRONMENT": "production"
   },
-  "functions": {
-    "src/api/**/*.js": {
-      "runtime": "nodejs18.x"
-    }
-  },
   "headers": [
     {
       "source": "/(.*)",
