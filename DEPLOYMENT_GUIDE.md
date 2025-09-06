@@ -2,7 +2,7 @@
 
 ## Overview
 
-This guide covers deploying MPS Connect to Render (backend + database) and Vercel (frontend) for production demo.
+This guide covers deploying MPS Connect to Render (backend + database) and GitHub Pages (frontend) for production demo.
 
 For detailed Render configuration, see [RENDER_DEPLOYMENT.md](./RENDER_DEPLOYMENT.md).
 
@@ -10,7 +10,7 @@ For detailed Render configuration, see [RENDER_DEPLOYMENT.md](./RENDER_DEPLOYMEN
 
 - GitHub repository with MPS Connect code
 - Render account (free tier)
-- Vercel account (free tier)
+- GitHub account with Pages enabled
 - Domain name (optional)
 
 ## Phase 1: Database Setup (PostgreSQL on Render)
@@ -87,34 +87,26 @@ PostgreSQL is a powerful relational database that provides:
      - `JWT_SECRET_KEY`: (generate random string)
      - `ENVIRONMENT`: `production`
      - `LOG_LEVEL`: `INFO`
-     - `CORS_ORIGINS`: `https://your-frontend.vercel.app`
+     - `CORS_ORIGINS`: `https://thegeekybeng.github.io`
 
-### Step 2: Vercel Frontend Setup
+### Step 2: Frontend Setup (GitHub Pages)
 
-1. **Create Vercel Account**
+1. **Enable GitHub Pages**
 
-   - Go to [vercel.com](https://vercel.com)
-   - Sign up with GitHub account
-   - Connect your repository
-
-2. **Deploy Frontend**
-   - Import project from GitHub
-   - Framework: Other
-   - Build Command: (leave empty)
-   - Output Directory: (leave empty)
-   - Environment Variables:
-     - `API_BASE_URL`: (your Render API URL)
+   - Use the provided GitHub Actions workflow in `.github/workflows/gh-pages.yml`
+   - Set repo secrets `VITE_API_URL` and `VITE_API_KEY`
+   - Push to `main` to deploy
 
 ### Step 3: Configuration
 
 1. **Update CORS Settings**
 
-   - Edit `api/app.py`
-   - Update `ALLOWED_ORIGINS` with Vercel URL
+   - Edit `api/app.py` or set `CORS_ORIGINS` in Render
+   - Include `https://thegeekybeng.github.io`
 
 2. **Test Deployment**
    - Backend health check: `https://your-api.onrender.com/healthz`
-   - Frontend: `https://your-app.vercel.app`
+   - Frontend: `https://thegeekybeng.github.io/mps-connect_beta-test/`
 
 ## Database Schema
 
@@ -155,13 +147,7 @@ The database includes these core tables:
 - Database: $0/month (1GB storage)
 - Bandwidth: $0/month (100GB)
 
-**Vercel (Free Tier)**
-
-- Frontend: $0/month
-- Bandwidth: $0/month (100GB)
-- Functions: $0/month (100GB-hours)
-
-**Total Cost: $0/month**
+**Total Cost: $0/month** (using Render free tiers + GitHub Pages)
 
 ## Troubleshooting
 
@@ -186,7 +172,6 @@ The database includes these core tables:
 ### Support
 
 - Render: [docs.render.com](https://docs.render.com)
-- Vercel: [vercel.com/docs](https://vercel.com/docs)
 - PostgreSQL: [postgresql.org/docs](https://postgresql.org/docs)
 
 ## Next Steps

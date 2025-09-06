@@ -77,8 +77,6 @@ DEFAULT_ALLOWED_ORIGINS = [
     "https://api.mpsconnect.thegeekybeng.com",
     "http://localhost:8080",
     "http://localhost:3000",
-    "https://mps-connect.vercel.app",
-    "https://mps-connect-git-main.vercel.app",
 ]
 
 # Allow overriding via CORS_ORIGINS env (comma-separated)

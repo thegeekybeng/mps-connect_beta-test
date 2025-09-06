@@ -108,12 +108,12 @@ def get_database_info() -> dict:
                     """
                 SELECT 
                     schemaname,
-                    tablename,
-                    n_tup_ins as inserts,
-                    n_tup_upd as updates,
-                    n_tup_del as deletes
+                    relname AS tablename,
+                    n_tup_ins AS inserts,
+                    n_tup_upd AS updates,
+                    n_tup_del AS deletes
                 FROM pg_stat_user_tables
-                ORDER BY tablename
+                ORDER BY relname
             """
                 )
             )

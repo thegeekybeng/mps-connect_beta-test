@@ -2,7 +2,7 @@
 
 ## Overview
 
-This guide explains the comprehensive hosting deployment implementation for MPS Connect using Render (backend) and Vercel (frontend) platforms with clear explainers for each component.
+This guide explains the comprehensive hosting deployment implementation for MPS Connect using Render (backend) and GitHub Pages (frontend) with clear explainers for each component.
 
 ## Hosting Architecture
 
@@ -40,9 +40,9 @@ This guide explains the comprehensive hosting deployment implementation for MPS 
 - **DigitalOcean**: DigitalOcean App Platform
 - **Heroku**: Heroku platform
 
-### **Vercel Platform (Frontend)**
+### **GitHub Pages (Frontend)**
 
-**What Vercel Does Functionally:**
+**What GitHub Pages Provides:**
 
 - **Frontend Hosting**: Optimized static site hosting
 - **Global CDN**: Worldwide content delivery network
@@ -64,7 +64,7 @@ This guide explains the comprehensive hosting deployment implementation for MPS 
 - Primarily for static/frontend applications
 - Limited backend capabilities
 - Cold start issues for serverless functions
-- Vendor lock-in to Vercel platform
+- Requires static hosting (no serverless functions)
 
 **Alternatives:**
 
@@ -186,11 +186,11 @@ This guide explains the comprehensive hosting deployment implementation for MPS 
 - Governance system compliance
 - Overall system health
 
-## Vercel Frontend Deployment
+## Frontend Deployment (GitHub Pages)
 
-### **Vercel Configuration (`vercel.json`)**
+### **GitHub Pages Workflow (`.github/workflows/gh-pages.yml`)**
 
-**What Vercel Configuration Provides:**
+**What the Workflow Provides:**
 
 - **Build Configuration**: Optimized build settings
 - **Routing**: API proxy and static file serving
@@ -208,7 +208,7 @@ This guide explains the comprehensive hosting deployment implementation for MPS 
   "builds": [
     {
       "src": "package.json",
-      "use": "@vercel/static-build",
+      "use": "@actions/setup-node",
       "config": {
         "distDir": "dist"
       }
@@ -308,9 +308,9 @@ This guide explains the comprehensive hosting deployment implementation for MPS 
 ./scripts/deploy_render.sh logs mps-connect-api
 ```
 
-### **Vercel Deployment Script (`scripts/deploy_vercel.sh`)**
+### **GitHub Pages Deployment**
 
-**What Vercel Deployment Script Provides:**
+**What the Workflow Provides:**
 
 - **Automated Deployment**: One-command frontend deployment
 - **Build Process**: Automated frontend building
@@ -322,17 +322,7 @@ This guide explains the comprehensive hosting deployment implementation for MPS 
 **Usage:**
 
 ```bash
-# Deploy to Vercel
-./scripts/deploy_vercel.sh deploy
-
-# Build frontend only
-./scripts/deploy_vercel.sh build
-
-# Check deployment status
-./scripts/deploy_vercel.sh status
-
-# View deployment logs
-./scripts/deploy_vercel.sh logs
+Deployment is triggered on push to `main`. The workflow builds the app and publishes `dist/` to GitHub Pages.
 ```
 
 ## Environment Configuration
@@ -360,7 +350,7 @@ JWT_SECRET_KEY=your_jwt_secret_key
 ```bash
 ENVIRONMENT=production
 LOG_LEVEL=INFO
-CORS_ORIGINS=https://mps-connect.vercel.app
+CORS_ORIGINS=https://thegeekybeng.github.io
 ```
 
 **Monitoring Configuration:**
@@ -371,7 +361,7 @@ ALERT_EMAIL=admin@mps-connect.local
 SMTP_HOST=smtp.your-provider.com
 ```
 
-### **Vercel Environment Variables**
+### **GitHub Pages Build Variables**
 
 **API Configuration:**
 
@@ -404,9 +394,9 @@ VITE_ENVIRONMENT=production
 - Automated security updates
 - Compliance reporting
 
-### **Vercel Security**
+### **Frontend Security**
 
-**What Vercel Security Provides:**
+**What Frontend Security Provides:**
 
 - **HTTPS Enforcement**: Automatic SSL/TLS certificates
 - **Security Headers**: Comprehensive HTTP security
@@ -446,9 +436,9 @@ VITE_ENVIRONMENT=production
 - Database performance
 - Cache hit rates
 
-### **Vercel Monitoring**
+### **Frontend Monitoring**
 
-**What Vercel Monitoring Provides:**
+**What Frontend Monitoring Provides:**
 
 - **Performance Analytics**: Real-time performance metrics
 - **Error Tracking**: JavaScript error monitoring
@@ -551,7 +541,7 @@ VITE_ENVIRONMENT=production
 - **Causes**: Environment variables, Docker issues, resource limits
 - **Solutions**: Check environment variables, verify Docker images, increase resource limits
 
-**2. Vercel Deployment Issues**
+**2. GitHub Pages Deployment Issues**
 
 - **Symptoms**: Frontend fails to build or deploy
 - **Causes**: Build errors, environment variables, configuration issues
@@ -584,17 +574,14 @@ render services list
 render services show mps-connect-api
 ```
 
-**Vercel Debugging:**
+**Frontend (GitHub Pages) Debugging:**
 
 ```bash
-# View deployment logs
-vercel logs
+# View workflow runs
+# (Navigate to GitHub → Repo → Actions → Select "Deploy Frontend to GitHub Pages")
 
-# Check deployment status
-vercel ls
-
-# View deployment details
-vercel inspect
+# Re-run the latest workflow if needed
+# (Use the "Re-run all jobs" button in the workflow run)
 ```
 
 ## Best Practices
@@ -627,7 +614,7 @@ vercel inspect
 
 The hosting deployment implementation provides:
 
-- **Complete Cloud Deployment**: Backend on Render, frontend on Vercel
+- **Complete Cloud Deployment**: Backend on Render, frontend on GitHub Pages
 - **High Availability**: Auto-scaling and load balancing
 - **Security**: Comprehensive security features
 - **Monitoring**: Full observability and alerting
@@ -639,7 +626,7 @@ This hosting architecture ensures that MPS Connect can be deployed reliably in t
 **Deployment URLs:**
 
 - **Backend API**: https://mps-connect-api.onrender.com
-- **Frontend Web**: https://mps-connect.vercel.app
+- **Frontend Web**: https://thegeekybeng.github.io/mps-connect_beta-test/
 - **Database**: Managed PostgreSQL on Render
 - **Cache**: Managed Redis on Render
-- **Monitoring**: Built-in Render and Vercel monitoring
+- **Monitoring**: Built-in Render monitoring

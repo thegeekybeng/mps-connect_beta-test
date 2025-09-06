@@ -31,7 +31,7 @@
 
 - **MPS Connect focus**: Focus on MPS Connect as a standalone repository
 - **Stay within boundaries**: Do not touch anything outside the MPS Connect Testers folder
-- **No Railway**: User prefers not to use Railway for deployments or testing
+- **No Vercel or Railway**: Do not use Vercel or Railway for deployments or testing
 
 ### Development Environment
 

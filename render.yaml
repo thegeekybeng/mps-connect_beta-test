@@ -70,7 +70,7 @@ services:
       - key: LOG_LEVEL
         value: INFO
       - key: CORS_ORIGINS
-        value: https://mps-connect.vercel.app,https://mps-connect-git-main.vercel.app
+        value: https://thegeekybeng.github.io
 
       # Model/artifacts configuration
       - key: MODEL_DIR

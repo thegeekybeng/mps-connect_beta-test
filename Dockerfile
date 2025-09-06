@@ -37,9 +37,9 @@ ENV PYTHONUNBUFFERED=1
 # Expose port (Render will set PORT environment variable)
 EXPOSE 8000
 
-# Health check
+# Health check respects PORT if provided
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8000/healthz || exit 1
+    CMD sh -c 'curl -f http://localhost:${PORT:-8000}/healthz || exit 1'
 
-# Start command (Render will override with PORT env var)
-CMD ["uvicorn", "api.app:app", "--host", "0.0.0.0", "--port", "8000"]
+# Start command that respects Render's PORT variable
+CMD ["sh", "-c", "uvicorn api.app:app --host 0.0.0.0 --port ${PORT:-8000}"]

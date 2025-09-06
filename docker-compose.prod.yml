@@ -80,7 +80,7 @@ services:
       # Application configuration
       ENVIRONMENT: production
       LOG_LEVEL: INFO
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,https://mps-connect.vercel.app}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,https://thegeekybeng.github.io}
       
       # Monitoring
       ENABLE_METRICS: true

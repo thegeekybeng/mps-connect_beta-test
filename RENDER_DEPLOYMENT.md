@@ -45,7 +45,7 @@ JWT_SECRET_KEY=your-jwt-secret-key-here
 ```
 ENVIRONMENT=production
 LOG_LEVEL=INFO
-CORS_ORIGINS=https://mps-connect.vercel.app,https://mps-connect-git-main.vercel.app
+CORS_ORIGINS=https://thegeekybeng.github.io
 ```
 
 #### Model Configuration

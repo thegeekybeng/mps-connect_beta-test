@@ -58,11 +58,11 @@ Git remote: Not available from current shell (path quoting issue). Please run `g
 
 - **Production Demo Deployment (Priority)**
 
-  - **Phase 1: Database Setup** - Set up free PostgreSQL database with encryption, audit logging tables, data retention policies
+  - **Phase 1: Database Setup** - Set up PostgreSQL database with encryption, audit logging tables, data retention policies
   - **Phase 2: Security Module** - TLS encryption for all connections, environment variable security, basic authentication system
   - **Phase 3: Governance Module** - Immutable audit logs, action tracking system, data lineage recording, compliance reporting
-  - **Phase 4: Docker Deployment** - Containerize frontend and backend, Docker Compose for local development, Railway deployment configuration
-  - **Phase 5: Free Hosting Setup** - Deploy to Vercel (frontend) + Railway (backend + database), monitoring and health checks
+  - **Phase 4: Docker Deployment** - Containerize frontend and backend, Docker Compose for local development
+  - **Phase 5: Hosting Setup** - Deploy backend to Render and frontend to GitHub Pages, with monitoring and health checks
 
 - **Chat Feature Advanced Improvements**
 
@@ -102,15 +102,15 @@ Git remote: Not available from current shell (path quoting issue). Please run `g
 
 ### **Free Hosting Stack**
 
-- **Frontend**: Vercel (Free tier - Unlimited personal projects, 100GB bandwidth)
-- **Backend**: Railway (Free tier - $5 credit monthly, PostgreSQL included)
-- **Database**: Railway PostgreSQL (Free tier - 1GB storage, encrypted at rest)
-- **Domain**: Railway subdomain (free) or custom domain
+- **Frontend**: GitHub Pages (static hosting with GitHub Actions)
+- **Backend**: Render (managed services)
+- **Database**: Render PostgreSQL
+- **Domain**: GitHub Pages subpath or custom domain
 - **Total Cost**: $0/month
 
 ### **Security Features (Free)**
 
-- **HTTPS Encryption**: Automatic with Vercel/Railway
+- **HTTPS Encryption**: GitHub Pages + Render provide HTTPS by default
 - **Database Encryption**: PostgreSQL encryption at rest
 - **Environment Variables**: Secure credential management
 - **TLS 1.3**: All connections encrypted
@@ -153,7 +153,7 @@ sessions, permissions, access_logs
 - **Code quality is production-ready** with all linter errors resolved (10 files, 50+ errors fixed)
 - **Database, Security, and Governance modules** fully implemented and tested
 - **Docker containerization** complete with production and development configurations
-- **Hosting deployment** configured for Render + Vercel with monitoring and backup
+- **Hosting deployment** configured for Render + GitHub Pages with monitoring and backup
 - **Comprehensive documentation** created for all deployment phases
 
 ## Immediate Next Steps
@@ -164,7 +164,7 @@ sessions, permissions, access_logs
    - **Phase 2: Security Module** - Implement TLS encryption and authentication
    - **Phase 3: Governance Module** - Add immutable audit logs and compliance tracking
    - **Phase 4: Docker Deployment** - Containerize application for easy deployment
-   - **Phase 5: Free Hosting Setup** - Deploy to Vercel + Railway with monitoring
+   - **Phase 5: Hosting Setup** - Deploy to Render + GitHub Pages with monitoring
 
 2. **Chat Feature Advanced Improvements**
 
