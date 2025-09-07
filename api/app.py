@@ -14,18 +14,18 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from pydantic import BaseModel  # type: ignore[attr-defined]
 
-# Security imports
-# pylint: disable=import-error
-from security.middleware import (  # type: ignore
-    SecurityMiddleware,
-    CORSecurityMiddleware,
-    ContentSecurityMiddleware,
-)
+# Security imports (commented out - middleware not currently used)
+# from ..security.middleware import (
+#     SecurityMiddleware,
+#     CORSecurityMiddleware,
+#     ContentSecurityMiddleware,
+# )
+
+# Database connection not currently used
 
 # pylint: disable=import-error
-from database.connection import get_db  # type: ignore
-
-# pylint: disable=import-error
+import auth_endpoints  # type: ignore
+import governance_endpoints  # type: ignore
 
 # sklearn imports (grouped)
 # pylint: disable=import-error
@@ -606,12 +606,8 @@ def mount_routes(prefix: str = ""):
         return result
 
 
-# Import and include authentication routes
-from api.auth_endpoints import router as auth_router  # type: ignore
-
-# Import and include governance routes
-from api.governance_endpoints import router as governance_router  # type: ignore
-
+auth_router = auth_endpoints.router
+governance_router = governance_endpoints.router
 app.include_router(auth_router)
 app.include_router(governance_router)
 

@@ -158,7 +158,7 @@ async def login_user(
 
         # Create tokens
         access_token = create_access_token({"sub": str(user.id), "email": user.email})
-        refresh_token = create_refresh_token({"sub": str(user.id)})
+        refresh_token_value = create_refresh_token({"sub": str(user.id)})
 
         # Create session
         create_session(db, user, request)
@@ -175,7 +175,7 @@ async def login_user(
 
         return TokenResponse(
             access_token=access_token,
-            refresh_token=refresh_token,
+            refresh_token=refresh_token_value,
             expires_in=30 * 60,  # 30 minutes
         )
 
