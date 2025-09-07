@@ -41,5 +41,5 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD sh -c 'PORT_CLEAN=${PORT%%.*}; if [ -z "$PORT_CLEAN" ]; then PORT_CLEAN=8000; fi; curl -f http://localhost:${PORT_CLEAN}/healthz || exit 1'
 
-# Start application via Python module that sanitizes PORT internally
-CMD ["python", "-m", "api.app"]
+# Start application with uvicorn, respecting PORT environment variable
+CMD sh -c 'PORT_CLEAN=${PORT%%.*}; if [ -z "$PORT_CLEAN" ]; then PORT_CLEAN=8000; fi; python -m uvicorn api.app:app --host 0.0.0.0 --port $PORT_CLEAN'

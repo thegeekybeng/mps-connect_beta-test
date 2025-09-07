@@ -8,16 +8,16 @@ from typing import Any, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
-from database.connection import get_db  # type: ignore
-from database.models import User  # type: ignore
-from security.auth import require_role  # type: ignore
-from governance.compliance import (  # type: ignore
+from ..database.connection import get_db  # type: ignore
+from ..database.models import User  # type: ignore
+from ..security.auth import require_role  # type: ignore
+from ..governance.compliance import (  # type: ignore
     ComplianceStatus,
     generate_compliance_report,
     check_compliance_status,
     get_compliance_metrics as get_compliance_metrics_func,
 )
-from governance.audit_verification import (  # type: ignore
+from ..governance.audit_verification import (  # type: ignore
     AuditVerifier,
     check_audit_integrity,
     get_audit_summary as get_audit_summary_func,

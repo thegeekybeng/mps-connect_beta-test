@@ -9,9 +9,9 @@ from fastapi.security import HTTPBearer
 from pydantic import BaseModel, EmailStr
 from sqlalchemy.orm import Session  # type: ignore
 
-from database.connection import get_db  # type: ignore
-from database.models import User  # type: ignore
-from security.auth import (  # type: ignore
+from ..database.connection import get_db  # type: ignore
+from ..database.models import User  # type: ignore
+from ..security.auth import (  # type: ignore
     authenticate_user,  # type: ignore
     create_user,  # type: ignore
     create_access_token,  # type: ignore
@@ -23,8 +23,8 @@ from security.auth import (  # type: ignore
     hash_password,  # type: ignore
     verify_password,  # type: ignore
 )
-from security.audit import log_user_activity  # type: ignore
-from security.encryption import validate_password_strength  # type: ignore
+from ..security.audit import log_user_activity  # type: ignore
+from ..security.encryption import validate_password_strength  # type: ignore
 
 logger = logging.getLogger(__name__)
 
