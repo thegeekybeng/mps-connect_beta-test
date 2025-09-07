@@ -617,13 +617,12 @@ mount_routes("/api")
 
 # Optional: run directly
 if __name__ == "__main__":
-    import re
     import uvicorn
 
     port_raw = os.getenv("PORT", "8000")
-    # Remove any trailing dots and extract only digits
-    port_clean = re.sub(r"[^\d]", "", port_raw)
-    port = int(port_clean) if port_clean else 8000
+    # Remove trailing dot and everything after (like shell: ${PORT%%.*})
+    port_str = port_raw.split(".", 1)[0]
+    port = int(port_str) if port_str.isdigit() else 8000
 
     uvicorn.run(
         app,
