@@ -63,6 +63,7 @@ PROVIDERS_JSON = os.environ.get("PROVIDERS_JSON", "./providers_map.json")
 # ------------------ APP ---------------------
 app = FastAPI()
 
+
 def _parse_cors(origins_env: Optional[str]) -> list[str]:
     if not origins_env:
         return []
