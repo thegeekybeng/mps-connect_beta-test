@@ -620,12 +620,17 @@ mount_routes("/api")
 
 # Optional: run directly
 if __name__ == "__main__":
+    import re
     import uvicorn
 
+    port_raw = os.getenv("PORT", "10000")
+    digits = re.findall(r"\d+", port_raw)
+    port = int(digits[-1]) if digits else 10000
+
     uvicorn.run(
-        "app:app",
+        app,
         host="0.0.0.0",
-        port=8000,
+        port=port,
         reload=False,
         log_level="info",
         access_log=True,
