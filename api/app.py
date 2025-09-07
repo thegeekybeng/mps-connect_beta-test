@@ -621,8 +621,9 @@ if __name__ == "__main__":
     import uvicorn
 
     port_raw = os.getenv("PORT", "8000")
-    match = re.search(r"\d+", port_raw)
-    port = int(match.group(0)) if match else 8000
+    # Remove any trailing dots and extract only digits
+    port_clean = re.sub(r"[^\d]", "", port_raw)
+    port = int(port_clean) if port_clean else 8000
 
     uvicorn.run(
         app,
