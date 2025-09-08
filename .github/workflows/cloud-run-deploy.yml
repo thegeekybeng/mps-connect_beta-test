@@ -7,8 +7,8 @@ on:
 
 env:
   PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
-  REGION: ${{ secrets.GCP_REGION || 'asia-southeast1' }}
-  SERVICE: ${{ secrets.CLOUD_RUN_SERVICE || 'mps-connect-api' }}
+  REGION: ${{ secrets.GCP_REGION }}
+  SERVICE: ${{ secrets.CLOUD_RUN_SERVICE }}
   MEMORY: 1Gi
   CPU: "1"
   CONCURRENCY: "40"
@@ -29,9 +29,25 @@ jobs:
           service_account_key: ${{ secrets.GCP_SA_KEY }}
           export_default_credentials: true
 
-      - name: Show gcloud info
+      - name: Validate inputs and set defaults
         run: |
+          set -euo pipefail
           gcloud --version
+          if [ -z "${PROJECT_ID:-}" ]; then
+            echo "ERROR: GCP_PROJECT_ID secret is not set." >&2
+            echo "Add repository secret GCP_PROJECT_ID (e.g., mps-connect-casewriter-ai)." >&2
+            exit 1
+          fi
+          # Default REGION if not provided
+          if [ -z "${REGION:-}" ]; then
+            echo "REGION not set, defaulting to asia-southeast1" >&2
+            echo "REGION=asia-southeast1" >> $GITHUB_ENV
+          fi
+          # Default SERVICE if not provided
+          if [ -z "${SERVICE:-}" ]; then
+            echo "SERVICE not set, defaulting to mps-connect-api" >&2
+            echo "SERVICE=mps-connect-api" >> $GITHUB_ENV
+          fi
           gcloud config set project "$PROJECT_ID"
 
       - name: Enable required services (idempotent)
@@ -64,4 +80,3 @@ jobs:
       - name: Health check
         run: |
           curl -fsSL "${{ steps.url.outputs.url }}/healthz" || (echo "Health check failed" && exit 1)
-
