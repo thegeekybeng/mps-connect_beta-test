@@ -2,18 +2,18 @@
 
 ## Overview
 
-This guide covers deploying MPS Connect to Render (backend + database) and GitHub Pages (frontend) for production demo.
+This guide previously referenced Render (backend + database) and GitHub Pages (frontend). Those instructions have been removed.
 
-For detailed Render configuration, see [RENDER_DEPLOYMENT.md](./RENDER_DEPLOYMENT.md).
+For Google Cloud deployment, use `DEPLOY_GCP.md` at the project root (Cloud Run + Firebase Hosting).
 
 ## Prerequisites
 
 - GitHub repository with MPS Connect code
-- Render account (free tier)
+- Cloud account for your chosen provider
 - GitHub account with Pages enabled
 - Domain name (optional)
 
-## Phase 1: Database Setup (PostgreSQL on Render)
+## Phase 1: Database Setup (placeholder)
 
 ### What PostgreSQL Does Functionally
 
@@ -50,63 +50,28 @@ PostgreSQL is a powerful relational database that provides:
 
 ## Deployment Steps
 
-### Step 1: Render Backend + Database Setup
+### Step 1: Backend + Database Setup (refer to your platform docs)
 
-1. **Create Render Account**
+1. Create or select your hosting account and link your repository as needed.
 
-   - Go to [render.com](https://render.com)
-   - Sign up with GitHub account
-   - Connect your repository
+2. Deploy your database (e.g., Cloud SQL, managed Postgres) and note the connection string.
 
-2. **Deploy PostgreSQL Database**
+3. Deploy Backend API using your platform’s standard container instructions and set the required environment variables.
 
-   - Create new PostgreSQL service
-   - Choose "Free" plan
-   - Select Singapore region
-   - Database name: `mpsconnect`
-   - User: `mpsconnect`
-   - Note the connection string
+### Step 2: Frontend Setup
 
-3. **Deploy Backend API**
-   - Create new Web Service
-   - Connect GitHub repository
-   - Choose "Free" plan
-   - **Docker Build Context Directory**: `.` (root of repository)
-   - **Dockerfile Path**: `./Dockerfile`
-   - **Docker Command**: `uvicorn api.app:app --host 0.0.0.0 --port $PORT`
-   - **Pre-Deploy Command**: `bash scripts/render_deploy.sh`
-   - **Auto-Deploy**: `On Commit`
-   - **Build Filters**: Include paths: `api/**`, `database/**`, `security/**`, `governance/**`, `alembic/**`, `scripts/**`, `requirements.txt`, `Dockerfile`, `alembic.ini`
-   - Environment Variables:
-     - `DATABASE_URL`: (from PostgreSQL service)
-     - `MODEL_DIR`: `./api/artifacts_zs_hier_plus`
-     - `PROVIDERS_JSON`: `./api/providers_map.json`
-     - `API_KEY`: `mps-85-whampoa`
-     - `SECRET_KEY`: (generate random string)
-     - `ENCRYPTION_KEY`: (generate random string)
-     - `JWT_SECRET_KEY`: (generate random string)
-     - `ENVIRONMENT`: `production`
-     - `LOG_LEVEL`: `INFO`
-     - `CORS_ORIGINS`: `https://thegeekybeng.github.io`
-
-### Step 2: Frontend Setup (GitHub Pages)
-
-1. **Enable GitHub Pages**
-
-   - Use the provided GitHub Actions workflow in `.github/workflows/gh-pages.yml`
-   - Set repo secrets `VITE_API_URL` and `VITE_API_KEY`
-   - Push to `main` to deploy
+1. Deploy the frontend to your hosting provider (e.g., Firebase Hosting) and configure `VITE_API_URL`.
 
 ### Step 3: Configuration
 
 1. **Update CORS Settings**
 
-   - Edit `api/app.py` or set `CORS_ORIGINS` in Render
-   - Include `https://thegeekybeng.github.io`
+   - Edit `app.py` or set `CORS_ORIGINS` on your hosting platform
+   - Include your frontend domain
 
 2. **Test Deployment**
-   - Backend health check: `https://your-api.onrender.com/healthz`
-   - Frontend: `https://thegeekybeng.github.io/mps-connect_beta-test/`
+   - Backend health check: `https://<your-api>/healthz`
+   - Frontend: `https://<your-frontend-domain>/`
 
 ## Database Schema
 
@@ -141,13 +106,7 @@ The database includes these core tables:
 
 ## Cost Analysis
 
-**Render (Free Tier)**
-
-- Backend: $0/month (750 hours)
-- Database: $0/month (1GB storage)
-- Bandwidth: $0/month (100GB)
-
-**Total Cost: $0/month** (using Render free tiers + GitHub Pages)
+Replace with provider-specific cost notes as needed.
 
 ## Troubleshooting
 
@@ -171,7 +130,7 @@ The database includes these core tables:
 
 ### Support
 
-- Render: [docs.render.com](https://docs.render.com)
+Refer to your selected platform’s documentation.
 - PostgreSQL: [postgresql.org/docs](https://postgresql.org/docs)
 
 ## Next Steps

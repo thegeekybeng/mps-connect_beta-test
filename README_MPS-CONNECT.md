@@ -48,8 +48,7 @@ uvicorn api.app:app --reload
 
 - [Deployment Guide](DEPLOYMENT_GUIDE.md)
 - [Docker Deployment Guide](DOCKER_DEPLOYMENT_GUIDE.md)
-- [Render Deployment](RENDER_DEPLOYMENT.md)
-- [Hosting Deployment Guide](HOSTING_DEPLOYMENT_GUIDE.md)
+- Google Cloud deployment: see `DEPLOY_GCP.md` at the project root
 - [Security Guide](SECURITY_GUIDE.md)
 - [Governance Guide](GOVERNANCE_GUIDE.md)
 
