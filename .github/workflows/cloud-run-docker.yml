@@ -9,10 +9,12 @@ env:
   PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
   REGION: ${{ secrets.GCP_REGION }}
   SERVICE: ${{ secrets.CLOUD_RUN_SERVICE }}
-  REPO: ${{ secrets.ARTIFACT_REPO || 'api' }}
-  MEMORY: 1Gi
+  REPO: ${{ secrets.ARTIFACT_REPO }}
+  MEMORY: 2Gi
   CPU: "1"
   CONCURRENCY: "40"
+  MIN_INSTANCES: ${{ secrets.CLOUD_RUN_MIN_INSTANCES }}
+  MAX_INSTANCES: ${{ secrets.CLOUD_RUN_MAX_INSTANCES }}
 
 jobs:
   build-and-deploy:
@@ -30,6 +32,8 @@ jobs:
           if [ -z "${REGION:-}" ]; then echo "REGION not set, defaulting to asia-southeast1"; echo REGION=asia-southeast1 >> $GITHUB_ENV; fi
           if [ -z "${SERVICE:-}" ]; then echo "SERVICE not set, defaulting to mps-connect-api"; echo SERVICE=mps-connect-api >> $GITHUB_ENV; fi
           if [ -z "${REPO:-}" ]; then echo "REPO not set, defaulting to api"; echo REPO=api >> $GITHUB_ENV; fi
+          if [ -z "${MIN_INSTANCES:-}" ]; then echo "MIN_INSTANCES not set, defaulting to 1"; echo MIN_INSTANCES=1 >> $GITHUB_ENV; fi
+          if [ -z "${MAX_INSTANCES:-}" ]; then echo "MAX_INSTANCES not set, defaulting to 10"; echo MAX_INSTANCES=10 >> $GITHUB_ENV; fi
 
       - name: Set up gcloud
         uses: google-github-actions/setup-gcloud@v2
@@ -58,6 +62,9 @@ jobs:
           echo "image=$IMAGE_URI" >> $GITHUB_OUTPUT
 
       - name: Deploy to Cloud Run
+        env:
+          CORS_ORIGINS: ${{ secrets.CORS_ORIGINS }}
+          API_KEY: ${{ secrets.API_KEY }}
         run: |
           set -euxo pipefail
           gcloud run deploy "$SERVICE" \
@@ -67,8 +74,45 @@ jobs:
             --allow-unauthenticated \
             --cpu "$CPU" \
             --memory "$MEMORY" \
-            --concurrency "$CONCURRENCY"
+            --concurrency "$CONCURRENCY" \
+            --min-instances "$MIN_INSTANCES" \
+            --max-instances "$MAX_INSTANCES" \
+            $( [ -n "${CORS_ORIGINS:-}" ] && echo --set-env-vars CORS_ORIGINS="$CORS_ORIGINS" ) \
+            $( [ -n "${API_KEY:-}" ] && echo --set-env-vars API_KEY="$API_KEY" )
 
       - name: Show service URL
         run: |
           gcloud run services describe "$SERVICE" --region "$REGION" --format='value(status.url)'
+
+      - name: Health check with retries
+        run: |
+          set -euxo pipefail
+          URL=$(gcloud run services describe "$SERVICE" --region "$REGION" --format='value(status.url)')
+          echo "Service: $URL"
+          for i in $(seq 1 12); do
+            if curl -fsS "$URL/healthz"; then
+              echo "Health OK"; exit 0; fi
+            echo "Waiting for healthy revision ($i/12)..."; sleep 10;
+          done
+          echo "Health check failed after retries" >&2
+          exit 1
+
+      - name: Smoke test /predict (optional)
+        if: ${{ env.API_KEY != '' }}
+        env:
+          API_KEY: ${{ secrets.API_KEY }}
+        run: |
+          set -euxo pipefail
+          URL=$(gcloud run services describe "$SERVICE" --region "$REGION" --format='value(status.url)')
+          echo "Predict smoke test against: $URL/predict"
+          # Retry a few times to allow first-time model load
+          for i in $(seq 1 6); do
+            if curl -fsS -X POST "$URL/predict" \
+              -H 'content-type: application/json' \
+              -H "X-API-Key: $API_KEY" \
+              -d '{"texts":["I need help with HDB rental arrears"],"return_providers":false}'; then
+              echo "Predict OK"; exit 0; fi
+            echo "Waiting for model warmup ($i/6)..."; sleep 10;
+          done
+          echo "Predict smoke test failed" >&2
+          exit 1

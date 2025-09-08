@@ -34,8 +34,14 @@ RUN chmod +x /app/scripts/*.sh
 ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
 
-# Expose port (Render will set PORT environment variable)
-EXPOSE 8000
+# Runtime environment
+ENV MODEL_DIR=/app/api/artifacts_zs_hier_plus \
+    PROVIDERS_JSON=/app/api/providers_map.json \
+    PYTHONPATH=/app \
+    PYTHONUNBUFFERED=1
+
+# Expose port (Cloud Run injects $PORT, default 8080)
+EXPOSE 8080
 
 # Start command via entrypoint script that sanitizes PORT
 CMD ["/app/scripts/start.sh"]
