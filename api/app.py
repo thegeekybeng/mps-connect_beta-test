@@ -63,6 +63,7 @@ PROVIDERS_JSON = os.environ.get("PROVIDERS_JSON", "./providers_map.json")
 # ------------------ APP ---------------------
 app = FastAPI()
 
+
 def _parse_cors(origins_env: Optional[str]) -> list[str]:
     if not origins_env:
         return []
@@ -70,13 +71,9 @@ def _parse_cors(origins_env: Optional[str]) -> list[str]:
 
 
 DEFAULT_ALLOWED_ORIGINS = [
-    "http://mpsconnect.thegeekybeng.com",
-    "https://thegeekybeng.github.io",
-    "https://thegeekybeng.github.io/mps-connect_testers",
-    "https://thegeekybeng.github.io/mps-connect_beta-test/",
-    "https://api.mpsconnect.thegeekybeng.com",
     "http://localhost:8080",
     "http://localhost:3000",
+    "http://localhost:5173",
 ]
 
 # Allow overriding via CORS_ORIGINS env (comma-separated)

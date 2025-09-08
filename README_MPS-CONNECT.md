@@ -23,16 +23,10 @@ Core chat and letter-generation features are complete, with ongoing work focusin
 
 ## Setup
 
-### Docker
+### Docker (local-only)
 
 ```bash
 docker compose -f docker-compose.dev.yml up --build
-```
-
-For a production-like stack:
-
-```bash
-docker compose -f docker-compose.prod.yml up --build
 ```
 
 ### Local Development
@@ -46,13 +40,11 @@ uvicorn api.app:app --reload
 
 ## Documentation
 
-- [Deployment Guide](DEPLOYMENT_GUIDE.md)
-- [Docker Deployment Guide](DOCKER_DEPLOYMENT_GUIDE.md)
-- Google Cloud deployment: see `DEPLOY_GCP.md` at the project root
+- Local-only: use this README. Cloud deployment docs removed for demo.
 - [Security Guide](SECURITY_GUIDE.md)
 - [Governance Guide](GOVERNANCE_GUIDE.md)
 
 ## Usage
 
 - **API**: `uvicorn api.app:app --reload` then visit `http://localhost:8000`.
-- **Frontend**: open [`index.html`](index.html) in a browser or build using [`web/Dockerfile`](web/Dockerfile).
+- **Frontend**: open [`index.html`](index.html) directly in your browser, or serve the folder via `python -m http.server 8080` and browse `http://localhost:8080`.

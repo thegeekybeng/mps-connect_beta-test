@@ -93,37 +93,13 @@ services:
       - ./data:/app/data
     command: ["uvicorn", "api.app:app", "--host", "0.0.0.0", "--port", "8000", "--reload", "--log-level", "debug"]
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/healthz"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 30s
 
-  # Web Frontend (Development)
-  web:
-    build:
-      context: .
-      dockerfile: Dockerfile.web
-    container_name: mps-connect-web-dev
-    restart: unless-stopped
-    environment:
-      API_URL: http://api:8000
-      ENVIRONMENT: development
-      VITE_API_URL: http://localhost:8000
-    ports:
-      - "3000:80"
-    networks:
-      - mps-dev-network
-    depends_on:
-      - api
-    volumes:
-      - .:/app  # Mount source code for hot reloading
-    command: ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "80"]
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+  # Web Frontend removed for localhost-only demo. Open index.html directly or serve via `python -m http.server`.
 
   # Database Migration Service
   migrate:
