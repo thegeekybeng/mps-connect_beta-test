@@ -19,9 +19,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-    defaults:
-      run:
-        working-directory: mps-connect_testers
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -56,6 +53,7 @@ jobs:
         run: |
           set -euxo pipefail
           IMAGE_URI="$REGION-docker.pkg.dev/$PROJECT_ID/$REPO/$SERVICE:$GITHUB_SHA"
+          # Build context is the repository root (this folder). Dockerfile is at repo root.
           gcloud builds submit --tag "$IMAGE_URI" .
           echo "image=$IMAGE_URI" >> $GITHUB_OUTPUT
 
@@ -74,4 +72,3 @@ jobs:
       - name: Show service URL
         run: |
           gcloud run services describe "$SERVICE" --region "$REGION" --format='value(status.url)'
-
