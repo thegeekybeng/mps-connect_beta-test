@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>MPS Connect — AI Approval Workflow System (Beta)</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Optional local overrides. Create env.js (gitignored) to set window.API_BASE, window.API_KEY, etc. -->
+  <script src="env.js"></script>
   <style>
     .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
     .badge { padding: 0.125rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem; background-color: rgb(243 244 246); border: 1px solid rgb(229 231 235); }
@@ -264,8 +266,9 @@ const qp = new URL(location.href).searchParams;
 
 /** ---------- Defaults (baked-in) ---------- */
 const BASE_DEFAULTS = {
-  apiBase: 'https://mps-connect-api-zbbhslvl2q-as.a.run.app', // GCP Cloud Run API
-  apiKey: 'mps-85-whampoa',                           // test key for beta
+  // Allow optional env.js to override these
+  apiBase: (window.API_BASE || (window.ENV && window.ENV.API_BASE)) || 'https://mps-connect-api-zbbhslvl2q-as.a.run.app',
+  apiKey: (window.API_KEY || (window.ENV && window.ENV.API_KEY)) || 'mps-85-whampoa',
   confidenceThreshold: 0.2,
   maxCategories: 6,
   maxSubCategories: 10
