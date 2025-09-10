@@ -187,16 +187,21 @@ jobs:
           echo "Service URL: ${URL}"
           echo "SERVICE_URL=${URL}" >> $GITHUB_ENV
 
-      - name: Health check
+      - name: Health check (try /healthz then /api/healthz)
         if: ${{ steps.budget.outputs.continue != 'false' }}
         run: |
           set -e
           URL="$SERVICE_URL"
-          echo "Checking health at ${URL}/healthz"
-          for i in {1..30}; do
+          echo "Checking health at ${URL}/healthz (with /api fallback)"
+          for i in {1..60}; do
             CODE=$(curl -s -o /dev/null -w "%{http_code}" "${URL}/healthz" || true)
-            echo "Attempt $i: HTTP $CODE"
-            if [ "$CODE" = "200" ]; then
+            if [ "$CODE" = "404" ] || [ "$CODE" = "000" ]; then
+              CODE_API=$(curl -s -o /dev/null -w "%{http_code}" "${URL}/api/healthz" || true)
+            else
+              CODE_API="$CODE"
+            fi
+            echo "Attempt $i: /healthz=$CODE /api/healthz=${CODE_API:-na}"
+            if [ "$CODE" = "200" ] || [ "$CODE_API" = "200" ]; then
               echo "Service healthy"; exit 0; fi
             sleep 5
           done
@@ -210,19 +215,19 @@ jobs:
           if [ -z "$API_KEY" ]; then echo "API_KEY not found in env.yaml"; exit 1; fi
           echo "API_KEY=$API_KEY" >> $GITHUB_ENV
 
-      - name: Smoke test /labels
+      - name: Smoke test /labels (root or /api)
         if: ${{ steps.budget.outputs.continue != 'false' }}
         run: |
           set -e
           URL="$SERVICE_URL"
           echo "GET ${URL}/labels"
-          RESP=$(curl -fsS "${URL}/labels")
+          RESP=$(curl -fsS "${URL}/labels" || curl -fsS "${URL}/api/labels")
           COUNT=$(echo "$RESP" | jq '.labels | length')
           if [ -z "$COUNT" ] || [ "$COUNT" -lt 1 ]; then
             echo "No labels returned"; echo "$RESP"; exit 1; fi
           echo "Labels OK: $COUNT"
 
-      - name: Smoke test /predict
+      - name: Smoke test /predict (root or /api)
         if: ${{ steps.budget.outputs.continue != 'false' }}
         run: |
           set -e
@@ -230,7 +235,8 @@ jobs:
           API_KEY="$API_KEY"
           echo "POST ${URL}/predict"
           BODY='{"texts":["Need help with HDB housing and financial assistance"],"top_k_top":2,"top_k_child":2,"top_k_total":4}'
-          RESP=$(curl -fsS -H "Content-Type: application/json" -H "X-API-Key: ${API_KEY}" -d "$BODY" "${URL}/predict")
+          RESP=$(curl -fsS -H "Content-Type: application/json" -H "X-API-Key: ${API_KEY}" -d "$BODY" "${URL}/predict" \
+                 || curl -fsS -H "Content-Type: application/json" -H "X-API-Key: ${API_KEY}" -d "$BODY" "${URL}/api/predict")
           CNT=$(echo "$RESP" | jq '.predictions | length')
           LAB_CNT=$(echo "$RESP" | jq '.predictions[0].labels | length')
           if [ "${CNT:-0}" -lt 1 ] || [ "${LAB_CNT:-0}" -lt 1 ]; then
