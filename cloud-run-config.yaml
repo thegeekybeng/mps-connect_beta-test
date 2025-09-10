@@ -15,7 +15,7 @@ spec:
       containerConcurrency: 100
       timeoutSeconds: 300
       containers:
-        - image: asia-southeast1-docker.pkg.dev/mps-connect-pilot/mps-connect/mps-connect-api:cloud-dev
+        - image: asia-southeast1-docker.pkg.dev/mpsconnect-cw-pilot/mps-connect/mps-connect-api:cloud-dev
           ports:
             - containerPort: 8080
           resources:
