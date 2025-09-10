@@ -21,4 +21,40 @@ cryptography==41.0.7
 
 # Environment and configuration
 python-dotenv==1.0.0
-email-validator==2.1.0   
+email-validator==2.1.0
+
+# AI Explainability and Transparency
+shap==0.42.1
+lime==0.2.0.1
+captum==0.6.0
+grad-cam==1.4.0
+
+# Governance and Compliance
+requests==2.31.0
+httpx==0.25.2
+jsonschema==4.19.2
+
+# Immutable Storage and Blockchain
+hashlib2==1.3.1
+merkle-tree==1.0.0
+cryptography==41.0.7
+
+# Audit and Logging
+structlog==23.2.0
+python-json-logger==2.0.7
+elasticsearch==8.11.0
+
+# Security and Encryption
+pyjwt==2.8.0
+bcrypt==4.1.2
+argon2-cffi==23.1.0
+keyring==24.3.0
+
+# Performance and Monitoring
+prometheus-client==0.19.0
+psutil==5.9.6
+memory-profiler==0.61.0
+
+# Database Extensions
+redis==5.0.1
+celery==5.3.4   

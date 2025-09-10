@@ -25,6 +25,15 @@ from security.middleware import (  # type: ignore
 # pylint: disable=import-error
 from database.connection import get_db  # type: ignore
 
+# AI Governance imports
+# pylint: disable=import-error
+from explainability import MPSExplainabilityEngine  # type: ignore
+from transparency import TransparencyEngine  # type: ignore
+from governance import GovernanceEngine  # type: ignore
+from immutable import ImmutableStorage  # type: ignore
+from audit import AuditLogger  # type: ignore
+from security import SecurityManager  # type: ignore
+
 # pylint: disable=import-error
 
 # sklearn imports (grouped)
@@ -62,6 +71,14 @@ PROVIDERS_JSON = os.environ.get("PROVIDERS_JSON", "./providers_map.json")
 
 # ------------------ APP ---------------------
 app = FastAPI()
+
+# Initialize AI Governance modules
+explainability_engine = MPSExplainabilityEngine()
+transparency_engine = TransparencyEngine()
+governance_engine = GovernanceEngine()
+immutable_storage = ImmutableStorage()
+audit_logger = AuditLogger()
+security_manager = SecurityManager()
 
 
 def _parse_cors(origins_env: Optional[str]) -> list[str]:
