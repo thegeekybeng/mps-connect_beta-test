@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
 
 env:
-  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID || 'mpsconnect-cw-pilot' }}
   REGION: ${{ secrets.GCP_REGION || 'asia-southeast1' }}
   REPO: ${{ secrets.ARTIFACT_REPO || 'mps-connect' }}
   SERVICE: mps-connect-api
