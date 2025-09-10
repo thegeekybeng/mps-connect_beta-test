@@ -39,7 +39,7 @@
         <label class="block">
           <span class="text-sm">API Base URL</span>
           <input id="apiBase" class="mt-1 w-full rounded-lg border px-3 py-2"
-                 placeholder="http://localhost:8000" />
+                 placeholder="https://mps-connect-api-zbbhslvl2q-as.a.run.app" />
         </label>
         <label class="block">
           <span class="text-sm">X-API-Key</span>
@@ -264,12 +264,18 @@ const qp = new URL(location.href).searchParams;
 
 /** ---------- Defaults (baked-in) ---------- */
 const BASE_DEFAULTS = {
-  apiBase: 'http://localhost:8000', // Local development
+  apiBase: 'https://mps-connect-api-zbbhslvl2q-as.a.run.app', // GCP Cloud Run API
   apiKey: 'mps-85-whampoa',                           // test key for beta
   confidenceThreshold: 0.2,
   maxCategories: 6,
   maxSubCategories: 10
 };
+
+// Clear old localhost settings from localStorage if they exist
+if (localStorage.getItem('wv.apiBase') === 'http://localhost:8000') {
+  localStorage.removeItem('wv.apiBase');
+  console.log('Cleared old localhost API setting from localStorage');
+}
 
 // Load order: URL params > localStorage > BASE_DEFAULTS
 const DEFAULTS = {
@@ -1838,6 +1844,9 @@ function generateTrafficFinesLetter(context, slots, caseText) {
   // Extract key information from case text
   const facts = extractEnhancedFacts(caseText);
   
+  // Generate subject line
+  const subjectLine = generateSubjectLine('transport', facts, slots);
+  
   // Determine letter tone based on context
   let openingTone = "I am writing to appeal";
   if (emotionalTone === 'stressed' || stressLevel === 'high') {
@@ -1857,17 +1866,25 @@ function generateTrafficFinesLetter(context, slots, caseText) {
   }
   
   // Generate professional letter with paraphrased content
-  let letter = `Dear Sir/Madam,
+  let letter = `Subject: ${subjectLine}
+
+Dear Sir/Madam,
 
 ${openingTone} the traffic fine issued to my constituent. I have reviewed the case details and would like to present the following information for your consideration.
 
 CASE REFERENCE:
+- Notice Number: ${trafficData.notice_number || 'To be provided'}
 - Offence Type: ${trafficData.offence_type || 'To be confirmed'}
-- Date of Offence: ${trafficData.offence_date || 'To be confirmed'}
+- Offence Date: ${trafficData.offence_date || 'To be confirmed'}
 - Location: ${trafficData.location || 'To be confirmed'}
-- Notice Reference: ${trafficData.notice_ref || 'To be confirmed'}
 - Fine Amount: $${trafficData.fine_amount || 'To be confirmed'}
 - Demerit Points: ${trafficData.demerit_points || 'To be confirmed'}
+
+FINANCIAL HARDSHIP SUMMARY:
+${trafficData.financial_hardship || 'Constituent experiencing financial difficulties that warrant compassionate consideration.'}
+
+REQUESTED OUTCOME:
+${trafficData.requested_outcome || 'Waiver of offence on compassionate grounds, including waiver of composite fine.'}
 
 CONSTITUENT'S SITUATION:
 ${facts.circumstances || 'My constituent has provided details regarding the circumstances surrounding this matter.'}${personalCircumstances}
@@ -1898,6 +1915,7 @@ function generateHDBAppealLetter(context, slots, caseText) {
   const facts = extractEnhancedFacts(caseText);
   const urgency = context.urgency || false;
   const emotionalTone = context.emotionalTone || 'neutral';
+  const subjectLine = generateSubjectLine('housing', facts, slots);
   
   let openingTone = "I am writing to appeal";
   if (urgency) {
@@ -1913,7 +1931,9 @@ function generateHDBAppealLetter(context, slots, caseText) {
     personalCircumstances += "\n\nGiven my current financial situation, I would be grateful for any flexibility in the terms or timeline for this matter.";
   }
   
-  return `Dear HDB Officer,
+  return `Subject: ${subjectLine}
+
+Dear HDB Officer,
 
 ${openingTone} the decision regarding my constituent's housing application/appeal.
 
@@ -2054,6 +2074,15 @@ function extractEnhancedFacts(caseText) {
     }
   });
   
+  // Enhanced compassionate circumstances extraction
+  facts.compassionateCircumstances = extractCompassionateCircumstances(caseText);
+  facts.familySituation = extractFamilySituation(caseText);
+  facts.financialHardship = extractFinancialHardship(caseText);
+  facts.jobSecurity = extractJobSecurityConcerns(caseText);
+  
+  // Priority classification
+  facts.priorityAnalysis = classifyPriorityLevel(caseText, facts);
+  
   // Extract key points for professional presentation
   facts.keyPoints = extractKeyPoints(caseText);
   facts.supportingEvidence = extractSupportingEvidence(caseText);
@@ -2132,11 +2161,59 @@ function extractKeyPoints(caseText) {
   const keyPoints = [];
   const text = caseText.toLowerCase();
   
-  // Extract specific amounts
-  const amountMatches = caseText.match(/\$[\d,]+/g);
-  if (amountMatches) {
-    amountMatches.forEach(amount => {
-      keyPoints.push(`Financial amount involved: ${amount}`);
+  // Enhanced financial amount extraction with context
+  const financialPatterns = {
+    fine: /(?:fine|penalty|summon).*?\$([\d,]+)/gi,
+    salary: /(?:salary|wage|earn|take home|take-home).*?\$([\d,]+)/gi,
+    income: /(?:income|before cpf|cpf deduction).*?\$([\d,]+)/gi,
+    demerit: /(?:demerit|points).*?(\d+)/gi
+  };
+  
+  // Extract fine amount
+  const fineMatches = caseText.match(financialPatterns.fine);
+  if (fineMatches) {
+    fineMatches.forEach(match => {
+      const amount = match.match(/\$([\d,]+)/);
+      if (amount) {
+        keyPoints.push(`Fine amount: $${amount[1]}`);
+      }
+    });
+  }
+  
+  // Extract salary information
+  const salaryMatches = caseText.match(financialPatterns.salary);
+  if (salaryMatches) {
+    salaryMatches.forEach(match => {
+      const amount = match.match(/\$([\d,]+)/);
+      if (amount) {
+        if (match.includes('take home') || match.includes('take-home')) {
+          keyPoints.push(`Take-home salary: $${amount[1]}`);
+        } else {
+          keyPoints.push(`Monthly salary: $${amount[1]}`);
+        }
+      }
+    });
+  }
+  
+  // Extract income before CPF
+  const incomeMatches = caseText.match(financialPatterns.income);
+  if (incomeMatches) {
+    incomeMatches.forEach(match => {
+      const amount = match.match(/\$([\d,]+)/);
+      if (amount) {
+        keyPoints.push(`Salary before CPF: $${amount[1]}`);
+      }
+    });
+  }
+  
+  // Extract demerit points
+  const demeritMatches = caseText.match(financialPatterns.demerit);
+  if (demeritMatches) {
+    demeritMatches.forEach(match => {
+      const points = match.match(/(\d+)/);
+      if (points) {
+        keyPoints.push(`Demerit points: ${points[1]}`);
+      }
     });
   }
   
@@ -2165,6 +2242,221 @@ function extractKeyPoints(caseText) {
   }
   
   return keyPoints;
+}
+
+// Enhanced compassionate circumstances extraction
+function extractCompassionateCircumstances(caseText) {
+  const circumstances = [];
+  const text = caseText.toLowerCase();
+  
+  // Sole breadwinner detection
+  if (text.includes('sole breadwinner') || text.includes('only breadwinner')) {
+    circumstances.push('Sole breadwinner of the household');
+  }
+  
+  // Family dependency
+  if (text.includes('three kids') || text.includes('3 kids') || text.includes('three children')) {
+    circumstances.push('Parent of three children');
+  }
+  
+  // Spouse health issues
+  if (text.includes('wife') && (text.includes('unable to work') || text.includes('health') || text.includes('sick'))) {
+    circumstances.push('Spouse unable to work due to health reasons');
+  }
+  
+  // Financial constraints
+  if (text.includes('barely enough') || text.includes('struggling') || text.includes('difficult')) {
+    circumstances.push('Experiencing significant financial constraints');
+  }
+  
+  return circumstances;
+}
+
+function extractFamilySituation(caseText) {
+  const family = [];
+  const text = caseText.toLowerCase();
+  
+  // Children count
+  const childrenMatch = text.match(/(?:three|3|four|4|five|5|six|6)\s+(?:kids|children)/);
+  if (childrenMatch) {
+    family.push(`Parent of ${childrenMatch[1]} children`);
+  }
+  
+  // Spouse situation
+  if (text.includes('wife') && text.includes('unable to work')) {
+    family.push('Spouse unable to work due to health reasons');
+  }
+  
+  // Family dependency
+  if (text.includes('depend') || text.includes('rely on')) {
+    family.push('Family members dependent on constituent');
+  }
+  
+  return family;
+}
+
+function extractFinancialHardship(caseText) {
+  const hardship = [];
+  const text = caseText.toLowerCase();
+  
+  // Income vs fine ratio
+  const fineMatch = text.match(/\$?(\d+).*?(?:fine|penalty)/);
+  const salaryMatch = text.match(/\$?(\d+).*?(?:take home|take-home)/);
+  
+  if (fineMatch && salaryMatch) {
+    const fine = parseInt(fineMatch[1]);
+    const salary = parseInt(salaryMatch[1]);
+    const ratio = Math.round((fine / salary) * 100);
+    hardship.push(`Fine represents ${ratio}% of monthly take-home salary`);
+  }
+  
+  // Financial struggle indicators
+  if (text.includes('barely enough') || text.includes('struggling')) {
+    hardship.push('Monthly income barely covers household expenses');
+  }
+  
+  if (text.includes('unable to pay')) {
+    hardship.push('Unable to pay the fine due to financial constraints');
+  }
+  
+  return hardship;
+}
+
+function extractJobSecurityConcerns(caseText) {
+  const concerns = [];
+  const text = caseText.toLowerCase();
+  
+  // Job loss risk
+  if (text.includes('lose my job') || text.includes('lose job')) {
+    concerns.push('Risk of job loss due to demerit points');
+  }
+  
+  // Driver-specific concerns
+  if (text.includes('driver') && text.includes('only work')) {
+    concerns.push('Driving is the only skill set available for employment');
+  }
+  
+  // License suspension
+  if (text.includes('demerit') && text.includes('points')) {
+    concerns.push('Demerit points may result in license suspension');
+  }
+  
+  return concerns;
+}
+
+// Priority Classification System
+function classifyPriorityLevel(caseText, facts) {
+  const text = caseText.toLowerCase();
+  const priorities = {
+    immediate: [],
+    medium: [],
+    low: []
+  };
+  
+  // IMMEDIATE ACTION indicators
+  if (text.includes('sole breadwinner') || text.includes('only breadwinner')) {
+    priorities.immediate.push('Sole breadwinner status - family welfare at risk');
+  }
+  
+  if (text.includes('lose my job') || text.includes('lose job')) {
+    priorities.immediate.push('Job security at risk - immediate income loss threat');
+  }
+  
+  // Check fine to salary ratio
+  const fineMatch = text.match(/\$?(\d+).*?(?:fine|penalty)/);
+  const salaryMatch = text.match(/\$?(\d+).*?(?:take home|take-home)/);
+  if (fineMatch && salaryMatch) {
+    const fine = parseInt(fineMatch[1]);
+    const salary = parseInt(salaryMatch[1]);
+    const ratio = (fine / salary) * 100;
+    if (ratio > 30) {
+      priorities.immediate.push(`Financial crisis - fine represents ${Math.round(ratio)}% of monthly income`);
+    }
+  }
+  
+  if (text.includes('unable to pay')) {
+    priorities.immediate.push('Unable to pay fine - immediate financial hardship');
+  }
+  
+  if (text.includes('three kids') || text.includes('3 kids')) {
+    priorities.immediate.push('Three children dependent - family stability at risk');
+  }
+  
+  // MEDIUM PRIORITY indicators
+  if (text.includes('wife') && text.includes('unable to work')) {
+    priorities.medium.push('Spouse health issues - long-term care needs');
+  }
+  
+  if (text.includes('driver') && text.includes('only work')) {
+    priorities.medium.push('Limited employment options - need alternative job placement');
+  }
+  
+  if (text.includes('demerit') && text.includes('points')) {
+    priorities.medium.push('License suspension risk - transportation challenges');
+  }
+  
+  if (text.includes('barely enough') || text.includes('struggling')) {
+    priorities.medium.push('Financial counseling needed - budget management support');
+  }
+  
+  // LOW PRIORITY indicators
+  if (text.includes('traffic') || text.includes('offence')) {
+    priorities.low.push('Traffic education - defensive driving courses');
+  }
+  
+  if (text.includes('cpf') || text.includes('salary')) {
+    priorities.low.push('Financial planning - CPF optimization advice');
+  }
+  
+  return priorities;
+}
+
+// Subject Line Generation
+function generateSubjectLine(category, facts, slots) {
+  const today = new Date().toISOString().slice(0, 10);
+  
+  // Traffic fines specific subject
+  if (category === 'transport' && slots?.transport?.traffic_fines) {
+    const trafficData = slots.transport.traffic_fines;
+    const refNumber = trafficData.notice_number || trafficData.reference || 'TBD';
+    const offenceType = trafficData.offence_type || 'Traffic Offence';
+    return `Appeal for Traffic Fine - Ref: ${refNumber} - ${offenceType} - ${today}`;
+  }
+  
+  // HDB appeals
+  if (category === 'housing' && slots?.housing?.hdb_appeals) {
+    const hdbData = slots.housing.hdb_appeals;
+    const refNumber = hdbData.reference_number || hdbData.application_id || 'TBD';
+    return `HDB Appeal - Ref: ${refNumber} - ${today}`;
+  }
+  
+  // ComCare applications
+  if (category === 'social_support' && slots?.social_support?.comcare_applications) {
+    const comcareData = slots.social_support.comcare_applications;
+    const refNumber = comcareData.application_id || comcareData.reference || 'TBD';
+    return `ComCare Application - Ref: ${refNumber} - ${today}`;
+  }
+  
+  // Employment matters
+  if (category === 'employment') {
+    const refNumber = facts.keyPoints.find(point => point.includes('Reference'))?.split(': ')[1] || 'TBD';
+    return `Employment Matter - Ref: ${refNumber} - ${today}`;
+  }
+  
+  // Tax/Finance matters
+  if (category === 'tax_finance') {
+    const refNumber = facts.keyPoints.find(point => point.includes('Reference'))?.split(': ')[1] || 'TBD';
+    return `Tax/Finance Matter - Ref: ${refNumber} - ${today}`;
+  }
+  
+  // Utilities/Communications
+  if (category === 'utilities_comms') {
+    const refNumber = facts.keyPoints.find(point => point.includes('Reference'))?.split(': ')[1] || 'TBD';
+    return `Utilities/Communications Matter - Ref: ${refNumber} - ${today}`;
+  }
+  
+  // Generic fallback
+  return `Constituent Matter - ${category.charAt(0).toUpperCase() + category.slice(1)} - ${today}`;
 }
 
 function extractSupportingEvidence(caseText) {
@@ -2267,7 +2559,12 @@ function generateCompassionateLetter(context, slots, caseText, category) {
     personalCircumstances += "\n\nI am also dealing with health issues that make this situation even more difficult to manage.";
   }
   
-  return `Dear Sir/Madam,
+  // Generate subject line
+  const subjectLine = generateSubjectLine(category, facts, slots);
+  
+  return `Subject: ${subjectLine}
+
+Dear Sir/Madam,
 
 I am writing to humbly request your compassionate consideration regarding the following matter on behalf of my constituent. I understand the importance of following proper procedures and my constituent takes full responsibility for their actions.
 
@@ -2277,6 +2574,18 @@ ${facts.circumstances || 'My constituent would like to provide additional contex
 KEY FACTS PRESENTED:
 ${facts.keyPoints.length > 0 ? facts.keyPoints.map(point => `• ${point}`).join('\n') : '• Detailed circumstances have been provided by the constituent'}
 
+COMPASSIONATE CIRCUMSTANCES:
+${facts.compassionateCircumstances.length > 0 ? facts.compassionateCircumstances.map(circ => `• ${circ}`).join('\n') : '• Constituent facing challenging personal circumstances'}
+
+FAMILY SITUATION:
+${facts.familySituation.length > 0 ? facts.familySituation.map(fam => `• ${fam}`).join('\n') : '• Family circumstances require consideration'}
+
+FINANCIAL HARDSHIP:
+${facts.financialHardship.length > 0 ? facts.financialHardship.map(fin => `• ${fin}`).join('\n') : '• Financial constraints affecting ability to resolve matter'}
+
+JOB SECURITY CONCERNS:
+${facts.jobSecurity.length > 0 ? facts.jobSecurity.map(job => `• ${job}`).join('\n') : '• Employment stability at risk'}
+
 SUPPORTING EVIDENCE:
 ${facts.supportingEvidence.length > 0 ? facts.supportingEvidence.map(evidence => `• ${evidence}`).join('\n') : '• Constituent is prepared to provide additional documentation as required'}
 
@@ -2284,6 +2593,9 @@ PERSONAL CIRCUMSTANCES:
 ${facts.impact || 'My constituent is facing challenging circumstances that warrant compassionate consideration.'}
 
 My constituent is committed to resolving this matter responsibly and would be deeply grateful for any consideration you can provide. I understand that everyone must follow the rules, but I hope you can see the human side of this situation.
+
+PRIORITY ANALYSIS:
+${facts.priorityAnalysis.immediate.length > 0 ? `IMMEDIATE ACTION REQUIRED:\n${facts.priorityAnalysis.immediate.map(item => `• ${item}`).join('\n')}\n\n` : ''}${facts.priorityAnalysis.medium.length > 0 ? `MEDIUM PRIORITY:\n${facts.priorityAnalysis.medium.map(item => `• ${item}`).join('\n')}\n\n` : ''}${facts.priorityAnalysis.low.length > 0 ? `LOW PRIORITY:\n${facts.priorityAnalysis.low.map(item => `• ${item}`).join('\n')}\n\n` : ''}
 
 My constituent is willing to work with you in any way possible to resolve this matter and would appreciate any guidance on how to proceed.
 
