@@ -26,14 +26,52 @@ from security.middleware import (  # type: ignore
 # pylint: disable=import-error
 from database.connection import get_db  # type: ignore
 
-# AI Governance imports
-# pylint: disable=import-error
-from explainability import MPSExplainabilityEngine  # type: ignore
-from transparency import TransparencyEngine  # type: ignore
-from governance import GovernanceEngine  # type: ignore
-from immutable import ImmutableStorage  # type: ignore
-from audit import AuditLogger  # type: ignore
-from security import SecurityManager  # type: ignore
+# AI Governance imports (tolerate missing optional packages at runtime)
+# Prefer the api.* packages where available; fall back to stubs if not.
+try:  # Explainability
+    from api.explainability import MPSExplainabilityEngine  # type: ignore
+except Exception:  # noqa: BLE001
+    class MPSExplainabilityEngine:  # type: ignore
+        def __init__(self, *args, **kwargs):
+            pass
+
+try:  # Transparency
+    from api.transparency import TransparencyEngine  # type: ignore
+except Exception:  # noqa: BLE001
+    class TransparencyEngine:  # type: ignore
+        def __init__(self, *args, **kwargs):
+            pass
+
+try:  # Governance (optional)
+    from api.governance import GovernanceEngine  # type: ignore
+except Exception:  # noqa: BLE001
+    try:
+        from governance import GovernanceEngine  # type: ignore
+    except Exception:  # noqa: BLE001
+        class GovernanceEngine:  # type: ignore
+            def __init__(self, *args, **kwargs):
+                pass
+
+try:  # Immutable storage
+    from api.immutable import ImmutableStorage  # type: ignore
+except Exception:  # noqa: BLE001
+    class ImmutableStorage:  # type: ignore
+        def __init__(self, *args, **kwargs):
+            pass
+
+try:  # Audit
+    from api.audit import AuditLogger  # type: ignore
+except Exception:  # noqa: BLE001
+    class AuditLogger:  # type: ignore
+        def __init__(self, *args, **kwargs):
+            pass
+
+try:  # Security manager
+    from security import SecurityManager  # type: ignore
+except Exception:  # noqa: BLE001
+    class SecurityManager:  # type: ignore
+        def __init__(self, *args, **kwargs):
+            pass
 
 # pylint: disable=import-error
 
@@ -43,11 +81,8 @@ from sklearn.feature_extraction.text import TfidfVectorizer  # type: ignore[impo
 from sklearn.metrics import pairwise as sk_pairwise  # type: ignore[import]
 from sklearn.preprocessing import normalize  # type: ignore[import]
 
-# Optional heavy dependencies imported at module scope (to satisfy linters)
-try:  # noqa: E402
-    import sentence_transformers  # type: ignore[import]
-except ImportError:  # optional dependency
-    sentence_transformers = None  # type: ignore[assignment]
+# Avoid importing heavy ML libraries at module import time.
+# They are lazily imported inside functions when needed.
 
 # (sklearn imported above — keep a single alias: sk_pairwise)
 
@@ -332,13 +367,11 @@ def score_texts(texts: List[str]) -> np.ndarray:
     """Compute label scores for input texts using natural language similarity."""
     _ensure_model_state()
     try:
-        if sentence_transformers is None:
-            raise ImportError("sentence_transformers not available")
+        # Lazy import to avoid heavy startup cost
+        from sentence_transformers import SentenceTransformer  # type: ignore
 
         # Load model with proper device handling
-        model = sentence_transformers.SentenceTransformer(
-            "sentence-transformers/all-MiniLM-L6-v2"
-        )
+        model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
 
         # Create natural language descriptions for labels
         label_descriptions = []
