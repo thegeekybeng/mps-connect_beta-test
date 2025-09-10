@@ -6,6 +6,7 @@ import json
 import logging
 from typing import List, Dict, Any, Optional, Tuple
 from dataclasses import dataclass
+import threading
 
 # pylint: disable=import-error
 import numpy as np
@@ -282,13 +283,25 @@ def _initialize_model_state():
 
 @app.on_event("startup")
 def _startup():
-    try:
-        logger.info("Starting MPS Connect API...")
-        app.state.ms = _initialize_model_state()
-        logger.info("MPS Connect API startup complete")
-    except (RuntimeError, ValueError, FileNotFoundError) as e:
-        logger.error("Startup failed: %s", e)
-        raise
+    """Start quickly and warm the model in the background.
+
+    Cloud Run expects the container to bind to $PORT promptly. Heavy
+    initialization in the startup hook can delay binding and cause deployment
+    to fail. We therefore spawn a background thread to load artifacts while the
+    server is already listening. First requests will still ensure the model is
+    initialized via _ensure_model_state().
+    """
+    app.state.ms = None  # type: ignore[assignment]
+
+    def _bg_warm():
+        try:
+            logger.info("[warmup] Initializing model state in background…")
+            app.state.ms = _initialize_model_state()
+            logger.info("[warmup] Model state ready")
+        except Exception as e:  # noqa: BLE001
+            logger.error("[warmup] Initialization failed: %s", e)
+
+    threading.Thread(target=_bg_warm, daemon=True).start()
 
 
 # 3) Replace global uses with app.state.ms (example in helpers)
@@ -537,7 +550,16 @@ def mount_routes(prefix: str = ""):
 
     @app.get(pfx + "/healthz")
     def healthz():
-        ms = app.state.ms
+        ms = getattr(app.state, "ms", None)
+        if ms is None:
+            return {
+                "status": "warming",
+                "labels": 0,
+                "tops": 0,
+                "model_dir": MODEL_DIR,
+                "providers_json": os.path.exists(PROVIDERS_JSON),
+                "meta": {},
+            }
         return {
             "status": "ok",
             "labels": len(ms.labels),
