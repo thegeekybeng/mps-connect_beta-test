@@ -139,3 +139,49 @@ jobs:
             sleep 5
           done
           echo "Service did not become healthy in time"; exit 1
+
+      - name: Extract API key from env.yaml
+        run: |
+          # Parses a simple KEY: "value" line for API_KEY
+          API_KEY=$(awk -F': ' '/^API_KEY:/ {gsub(/"/,"",$2); print $2}' env.yaml | tr -d '\r')
+          if [ -z "$API_KEY" ]; then echo "API_KEY not found in env.yaml"; exit 1; fi
+          echo "API_KEY=$API_KEY" >> $GITHUB_ENV
+
+      - name: Smoke test /labels
+        run: |
+          set -e
+          URL="$SERVICE_URL"
+          echo "GET ${URL}/labels"
+          RESP=$(curl -fsS "${URL}/labels")
+          python - <<'PY'
+import json, os, sys
+resp = json.loads(os.environ.get('RESP_JSON','')) if False else None
+PY
+          python - <<'PY'
+import json, os, sys
+data = json.loads(open(0).read())
+labels = data.get('labels') or []
+assert isinstance(labels, list) and len(labels) >= 1, 'No labels returned'
+print(f"Labels OK: {len(labels)} labels")
+PY <<EOF
+$RESP
+EOF
+
+      - name: Smoke test /predict
+        run: |
+          set -e
+          URL="$SERVICE_URL"
+          API_KEY="$API_KEY"
+          echo "POST ${URL}/predict"
+          BODY='{"texts":["Need help with HDB housing and financial assistance"],"top_k_top":2,"top_k_child":2,"top_k_total":4}'
+          RESP=$(curl -fsS -H "Content-Type: application/json" -H "X-API-Key: ${API_KEY}" -d "$BODY" "${URL}/predict")
+          python - <<'PY'
+import json, sys
+data = json.loads(sys.stdin.read())
+preds = data.get('predictions') or []
+assert isinstance(preds, list) and len(preds) >= 1, 'No predictions returned'
+assert isinstance(preds[0].get('labels'), list), 'Missing labels in prediction'
+print('Predict OK: labels=', len(preds[0]['labels']))
+PY <<EOF
+$RESP
+EOF
