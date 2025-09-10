@@ -15,6 +15,8 @@ env:
   REPO: ${{ secrets.ARTIFACT_REPO || 'mps-connect' }}
   SERVICE: mps-connect-api
   IMAGE_TAG: cloud-dev-${{ github.sha }}
+  # Pre-deploy warm setting; default 0 to avoid cost unless explicitly set
+  MIN_INSTANCES: ${{ secrets.CLOUD_RUN_MIN_INSTANCES || '0' }}
   # Mirror secrets to env so we can reference them in if: conditions
   WIF_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
   SA_EMAIL: ${{ secrets.GCP_SERVICE_ACCOUNT }}
@@ -158,6 +160,7 @@ jobs:
             --image "$IMAGE_URI" \
             --region "$REGION" \
             --allow-unauthenticated \
+            --min-instances "${MIN_INSTANCES}" \
             --cpu 2 --memory 3Gi --timeout 300 \
             --max-instances 10 \
             --execution-environment gen2 \
