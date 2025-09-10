@@ -50,6 +50,16 @@ jobs:
           : "${REPO:?Missing ARTIFACT_REPO (or default) secret}"
           test -f env.yaml || { echo "env.yaml missing in repo root"; exit 1; }
 
+      - name: Budget / deploy guard
+        id: budget
+        env:
+          DEPLOY_PAUSE: ${{ secrets.DEPLOY_PAUSE }}
+          BUDGET_GUARD_ENABLED: ${{ secrets.BUDGET_GUARD_ENABLED }}
+          BUDGET_MAX_MONTHLY_USD: ${{ secrets.BUDGET_MAX_MONTHLY_USD }}
+          BUDGET_USAGE_URL: ${{ secrets.BUDGET_USAGE_URL }}
+          BUDGET_USAGE_TOKEN: ${{ secrets.BUDGET_USAGE_TOKEN }}
+        run: bash scripts/budget_guard.sh
+
       # Authenticate to Google Cloud - choose one method below
       # Method A: Workload Identity Federation (recommended)
       - name: Auth via Workload Identity Federation
@@ -67,16 +77,19 @@ jobs:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
 
       - name: Setup gcloud
+        if: ${{ steps.budget.outputs.continue != 'false' }}
         uses: google-github-actions/setup-gcloud@v2
         with:
           project_id: ${{ env.PROJECT_ID }}
 
       - name: Configure defaults
+        if: ${{ steps.budget.outputs.continue != 'false' }}
         run: |
           gcloud config set project "$PROJECT_ID"
           gcloud config set run/region "${REGION}"
 
       - name: Enable required services
+        if: ${{ steps.budget.outputs.continue != 'false' }}
         run: |
           gcloud services enable \
             run.googleapis.com \
@@ -86,6 +99,7 @@ jobs:
             compute.googleapis.com
 
       - name: Ensure Artifact Registry repo
+        if: ${{ steps.budget.outputs.continue != 'false' }}
         run: |
           gcloud artifacts repositories describe "$REPO" --location="$REGION" \
             || gcloud artifacts repositories create "$REPO" \
@@ -94,6 +108,7 @@ jobs:
                  --description="MPS Connect images"
 
       - name: Build and push image (Cloud Build)
+        if: ${{ steps.budget.outputs.continue != 'false' }}
         run: |
           IMAGE_URI="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO}/${SERVICE}:${IMAGE_TAG}"
           echo "Building and pushing ${IMAGE_URI}"
@@ -101,6 +116,7 @@ jobs:
           echo "IMAGE_URI=${IMAGE_URI}" >> $GITHUB_ENV
 
       - name: Deploy to Cloud Run
+        if: ${{ steps.budget.outputs.continue != 'false' }}
         run: |
           # Grant artifact registry reader to runtime SA (idempotent)
           PROJECT_NUMBER=$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')
@@ -121,12 +137,14 @@ jobs:
             --env-vars-file env.yaml
 
       - name: Show service URL
+        if: ${{ steps.budget.outputs.continue != 'false' }}
         run: |
           URL=$(gcloud run services describe "$SERVICE" --region "$REGION" --format='value(status.url)')
           echo "Service URL: ${URL}"
           echo "SERVICE_URL=${URL}" >> $GITHUB_ENV
 
       - name: Health check
+        if: ${{ steps.budget.outputs.continue != 'false' }}
         run: |
           set -e
           URL="$SERVICE_URL"
@@ -141,6 +159,7 @@ jobs:
           echo "Service did not become healthy in time"; exit 1
 
       - name: Extract API key from env.yaml
+        if: ${{ steps.budget.outputs.continue != 'false' }}
         run: |
           # Parses a simple KEY: "value" line for API_KEY
           API_KEY=$(awk -F': ' '/^API_KEY:/ {gsub(/"/,"",$2); print $2}' env.yaml | tr -d '\r')
@@ -148,6 +167,7 @@ jobs:
           echo "API_KEY=$API_KEY" >> $GITHUB_ENV
 
       - name: Smoke test /labels
+        if: ${{ steps.budget.outputs.continue != 'false' }}
         run: |
           set -e
           URL="$SERVICE_URL"
@@ -168,6 +188,7 @@ $RESP
 EOF
 
       - name: Smoke test /predict
+        if: ${{ steps.budget.outputs.continue != 'false' }}
         run: |
           set -e
           URL="$SERVICE_URL"
