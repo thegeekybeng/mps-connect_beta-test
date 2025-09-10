@@ -4,24 +4,51 @@ on:
   push:
     branches:
       - cloud_dev
+  pull_request:
+    branches:
+      - cloud_dev
+  workflow_dispatch:
 
 env:
   PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
   REGION: ${{ secrets.GCP_REGION || 'asia-southeast1' }}
   REPO: ${{ secrets.ARTIFACT_REPO || 'mps-connect' }}
   SERVICE: mps-connect-api
-  IMAGE_TAG: cloud-dev
+  IMAGE_TAG: cloud-dev-${{ github.sha }}
 
 jobs:
+  build_pr:
+    if: ${{ github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Docker build (syntax check)
+        run: |
+          docker build -f Dockerfile -t local/check:latest .
+
   deploy:
+    if: ${{ github.event_name != 'pull_request' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
       id-token: write
+    concurrency:
+      group: cloud-run-${{ github.ref }}
+      cancel-in-progress: true
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Validate required secrets and files
+        run: |
+          : "${PROJECT_ID:?Missing GCP_PROJECT_ID secret}"
+          : "${REGION:?Missing GCP_REGION (or default) secret}"
+          : "${REPO:?Missing ARTIFACT_REPO (or default) secret}"
+          test -f env.yaml || { echo "env.yaml missing in repo root"; exit 1; }
 
       # Authenticate to Google Cloud - choose one method below
       # Method A: Workload Identity Federation (recommended)
@@ -90,6 +117,7 @@ jobs:
             --allow-unauthenticated \
             --cpu 2 --memory 2Gi --timeout 300 \
             --max-instances 10 \
+            --execution-environment gen2 \
             --env-vars-file env.yaml
 
       - name: Show service URL
@@ -98,3 +126,16 @@ jobs:
           echo "Service URL: ${URL}"
           echo "SERVICE_URL=${URL}" >> $GITHUB_ENV
 
+      - name: Health check
+        run: |
+          set -e
+          URL="$SERVICE_URL"
+          echo "Checking health at ${URL}/healthz"
+          for i in {1..30}; do
+            CODE=$(curl -s -o /dev/null -w "%{http_code}" "${URL}/healthz" || true)
+            echo "Attempt $i: HTTP $CODE"
+            if [ "$CODE" = "200" ]; then
+              echo "Service healthy"; exit 0; fi
+            sleep 5
+          done
+          echo "Service did not become healthy in time"; exit 1
