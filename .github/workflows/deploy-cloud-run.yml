@@ -125,15 +125,14 @@ jobs:
           gcloud config set project "$PROJECT_ID"
           gcloud config set run/region "${REGION}"
 
-      - name: Enable required services
+      - name: Enable required services (best-effort)
         if: ${{ steps.budget.outputs.continue != 'false' }}
         run: |
           gcloud services enable \
             run.googleapis.com \
             artifactregistry.googleapis.com \
-            cloudbuild.googleapis.com \
             iam.googleapis.com \
-            compute.googleapis.com
+            compute.googleapis.com || true
 
       - name: Ensure Artifact Registry repo
         if: ${{ steps.budget.outputs.continue != 'false' }}
@@ -144,12 +143,19 @@ jobs:
                  --location="$REGION" \
                  --description="MPS Connect images"
 
-      - name: Build and push image (Cloud Build)
+      - name: Auth Docker to Artifact Registry
+        if: ${{ steps.budget.outputs.continue != 'false' }}
+        run: |
+          gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
+
+      - name: Build and push image (Docker)
         if: ${{ steps.budget.outputs.continue != 'false' }}
         run: |
           IMAGE_URI="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO}/${SERVICE}:${IMAGE_TAG}"
-          echo "Building and pushing ${IMAGE_URI}"
-          gcloud builds submit --tag "$IMAGE_URI" .
+          echo "Building ${IMAGE_URI}"
+          docker build -f Dockerfile -t "$IMAGE_URI" .
+          echo "Pushing ${IMAGE_URI}"
+          docker push "$IMAGE_URI"
           echo "IMAGE_URI=${IMAGE_URI}" >> $GITHUB_ENV
 
       - name: Deploy to Cloud Run
