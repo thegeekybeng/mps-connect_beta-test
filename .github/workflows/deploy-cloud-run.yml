@@ -173,19 +173,10 @@ jobs:
           URL="$SERVICE_URL"
           echo "GET ${URL}/labels"
           RESP=$(curl -fsS "${URL}/labels")
-          python - <<'PY'
-import json, os, sys
-resp = json.loads(os.environ.get('RESP_JSON','')) if False else None
-PY
-          python - <<'PY'
-import json, os, sys
-data = json.loads(open(0).read())
-labels = data.get('labels') or []
-assert isinstance(labels, list) and len(labels) >= 1, 'No labels returned'
-print(f"Labels OK: {len(labels)} labels")
-PY <<EOF
-$RESP
-EOF
+          COUNT=$(echo "$RESP" | jq '.labels | length')
+          if [ -z "$COUNT" ] || [ "$COUNT" -lt 1 ]; then
+            echo "No labels returned"; echo "$RESP"; exit 1; fi
+          echo "Labels OK: $COUNT"
 
       - name: Smoke test /predict
         if: ${{ steps.budget.outputs.continue != 'false' }}
@@ -196,13 +187,8 @@ EOF
           echo "POST ${URL}/predict"
           BODY='{"texts":["Need help with HDB housing and financial assistance"],"top_k_top":2,"top_k_child":2,"top_k_total":4}'
           RESP=$(curl -fsS -H "Content-Type: application/json" -H "X-API-Key: ${API_KEY}" -d "$BODY" "${URL}/predict")
-          python - <<'PY'
-import json, sys
-data = json.loads(sys.stdin.read())
-preds = data.get('predictions') or []
-assert isinstance(preds, list) and len(preds) >= 1, 'No predictions returned'
-assert isinstance(preds[0].get('labels'), list), 'Missing labels in prediction'
-print('Predict OK: labels=', len(preds[0]['labels']))
-PY <<EOF
-$RESP
-EOF
+          CNT=$(echo "$RESP" | jq '.predictions | length')
+          LAB_CNT=$(echo "$RESP" | jq '.predictions[0].labels | length')
+          if [ "${CNT:-0}" -lt 1 ] || [ "${LAB_CNT:-0}" -lt 1 ]; then
+            echo "Predict failed"; echo "$RESP"; exit 1; fi
+          echo "Predict OK: labels=$LAB_CNT"
