@@ -15,6 +15,10 @@ env:
   REPO: ${{ secrets.ARTIFACT_REPO || 'mps-connect' }}
   SERVICE: mps-connect-api
   IMAGE_TAG: cloud-dev-${{ github.sha }}
+  # Mirror secrets to env so we can reference them in if: conditions
+  WIF_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+  SA_EMAIL: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+  SA_KEY: ${{ secrets.GCP_SA_KEY }}
 
 jobs:
   build_pr:
@@ -43,6 +47,12 @@ jobs:
         with:
           fetch-depth: 1
 
+      - name: Ensure jq is available
+        run: |
+          if ! command -v jq >/dev/null 2>&1; then
+            sudo apt-get update -y && sudo apt-get install -y jq
+          fi
+
       - name: Validate required secrets and files
         run: |
           : "${PROJECT_ID:?Missing GCP_PROJECT_ID secret}"
@@ -63,18 +73,18 @@ jobs:
       # Authenticate to Google Cloud - choose one method below
       # Method A: Workload Identity Federation (recommended)
       - name: Auth via Workload Identity Federation
-        if: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER && secrets.GCP_SERVICE_ACCOUNT }}
+        if: ${{ env.WIF_PROVIDER != '' && env.SA_EMAIL != '' }}
         uses: google-github-actions/auth@v2
         with:
-          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+          workload_identity_provider: ${{ env.WIF_PROVIDER }}
+          service_account: ${{ env.SA_EMAIL }}
 
       # Method B: Service Account Key (fallback)
       - name: Auth via Service Account Key
-        if: ${{ !secrets.GCP_WORKLOAD_IDENTITY_PROVIDER && secrets.GCP_SA_KEY }}
+        if: ${{ env.WIF_PROVIDER == '' && env.SA_KEY != '' }}
         uses: google-github-actions/auth@v2
         with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
+          credentials_json: ${{ env.SA_KEY }}
 
       - name: Setup gcloud
         if: ${{ steps.budget.outputs.continue != 'false' }}
