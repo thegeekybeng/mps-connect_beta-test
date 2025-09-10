@@ -2083,6 +2083,9 @@ function extractEnhancedFacts(caseText) {
   // Priority classification
   facts.priorityAnalysis = classifyPriorityLevel(caseText, facts);
   
+  // Additional help recommendations
+  facts.additionalHelp = generateAdditionalHelpRecommendations(caseText, facts);
+  
   // Extract key points for professional presentation
   facts.keyPoints = extractKeyPoints(caseText);
   facts.supportingEvidence = extractSupportingEvidence(caseText);
@@ -2411,6 +2414,133 @@ function classifyPriorityLevel(caseText, facts) {
   return priorities;
 }
 
+// Additional Help Recommendations using NLP
+function generateAdditionalHelpRecommendations(caseText, facts) {
+  const text = caseText.toLowerCase();
+  const recommendations = {
+    immediate: [],
+    medium: [],
+    low: [],
+    governmentServices: [],
+    followUpActions: []
+  };
+  
+  // IMMEDIATE HELP AREAS
+  
+  // Financial crisis detection
+  if (text.includes('unable to pay') || text.includes('can\'t afford')) {
+    recommendations.immediate.push({
+      area: 'Financial Crisis Intervention',
+      issue: 'Unable to pay fine due to financial constraints',
+      help: 'Emergency financial assistance, payment plan arrangements',
+      agency: 'ComCare, Social Service Office',
+      urgency: 'IMMEDIATE'
+    });
+  }
+  
+  // Job loss risk detection
+  if (text.includes('lose my job') || text.includes('lose job')) {
+    recommendations.immediate.push({
+      area: 'Job Security Protection',
+      issue: 'Risk of job loss due to demerit points',
+      help: 'License suspension appeal, alternative employment support',
+      agency: 'Traffic Police, Workforce Singapore',
+      urgency: 'IMMEDIATE'
+    });
+  }
+  
+  // Family welfare detection
+  if (text.includes('sole breadwinner') && text.includes('kids')) {
+    recommendations.immediate.push({
+      area: 'Family Welfare Support',
+      issue: 'Sole breadwinner with dependent children',
+      help: 'Family support services, childcare assistance',
+      agency: 'MSF, Social Service Office',
+      urgency: 'IMMEDIATE'
+    });
+  }
+  
+  // MEDIUM PRIORITY HELP AREAS
+  
+  // Healthcare support detection
+  if (text.includes('unable to work') && (text.includes('health') || text.includes('sick'))) {
+    recommendations.medium.push({
+      area: 'Healthcare Support',
+      issue: 'Spouse unable to work due to health reasons',
+      help: 'Medical assistance, disability support, caregiver support',
+      agency: 'MOH, AIC (Agency for Integrated Care)',
+      urgency: 'MEDIUM'
+    });
+  }
+  
+  // Employment diversification detection
+  if (text.includes('only work') || text.includes('only job')) {
+    recommendations.medium.push({
+      area: 'Employment Diversification',
+      issue: 'Limited to single skill set',
+      help: 'Skills training, job placement, career counseling',
+      agency: 'Workforce Singapore, SkillsFuture',
+      urgency: 'MEDIUM'
+    });
+  }
+  
+  // Financial management detection
+  if (text.includes('barely enough') || text.includes('struggling')) {
+    recommendations.medium.push({
+      area: 'Financial Management',
+      issue: 'Income barely covers expenses',
+      help: 'Budget counseling, debt management, financial planning',
+      agency: 'Credit Counselling Singapore, Social Service Office',
+      urgency: 'MEDIUM'
+    });
+  }
+  
+  // LOW PRIORITY HELP AREAS
+  
+  // Traffic education detection
+  if (text.includes('traffic') || text.includes('offence') || text.includes('demerit')) {
+    recommendations.low.push({
+      area: 'Traffic Education',
+      issue: 'Need to prevent future violations',
+      help: 'Defensive driving courses, traffic safety education',
+      agency: 'Traffic Police, Driving Schools',
+      urgency: 'LOW'
+    });
+  }
+  
+  // CPF optimization detection
+  if (text.includes('cpf') || text.includes('before cpf')) {
+    recommendations.low.push({
+      area: 'CPF Optimization',
+      issue: 'CPF planning and optimization',
+      help: 'CPF planning, retirement planning advice',
+      agency: 'CPF Board, Financial Advisory Services',
+      urgency: 'LOW'
+    });
+  }
+  
+  // GOVERNMENT SERVICES RECOMMENDATIONS
+  recommendations.governmentServices = [
+    'ComCare Financial Assistance',
+    'Workfare Income Supplement (WIS)',
+    'SkillsFuture Credit for training',
+    'Workforce Singapore job placement',
+    'AIC caregiver support services',
+    'MSF family support services'
+  ];
+  
+  // FOLLOW-UP ACTIONS
+  recommendations.followUpActions = [
+    'Schedule follow-up meeting in 2 weeks',
+    'Connect with relevant government agencies',
+    'Provide contact information for support services',
+    'Monitor case progress and outcomes',
+    'Offer ongoing assistance and guidance'
+  ];
+  
+  return recommendations;
+}
+
 // Subject Line Generation
 function generateSubjectLine(category, facts, slots) {
   const today = new Date().toISOString().slice(0, 10);
@@ -2596,6 +2726,15 @@ My constituent is committed to resolving this matter responsibly and would be de
 
 PRIORITY ANALYSIS:
 ${facts.priorityAnalysis.immediate.length > 0 ? `IMMEDIATE ACTION REQUIRED:\n${facts.priorityAnalysis.immediate.map(item => `• ${item}`).join('\n')}\n\n` : ''}${facts.priorityAnalysis.medium.length > 0 ? `MEDIUM PRIORITY:\n${facts.priorityAnalysis.medium.map(item => `• ${item}`).join('\n')}\n\n` : ''}${facts.priorityAnalysis.low.length > 0 ? `LOW PRIORITY:\n${facts.priorityAnalysis.low.map(item => `• ${item}`).join('\n')}\n\n` : ''}
+
+ADDITIONAL HELP RECOMMENDATIONS:
+${facts.additionalHelp.immediate.length > 0 ? `IMMEDIATE ASSISTANCE NEEDED:\n${facts.additionalHelp.immediate.map(rec => `• ${rec.area}: ${rec.help} (Contact: ${rec.agency})`).join('\n')}\n\n` : ''}${facts.additionalHelp.medium.length > 0 ? `MEDIUM PRIORITY SUPPORT:\n${facts.additionalHelp.medium.map(rec => `• ${rec.area}: ${rec.help} (Contact: ${rec.agency})`).join('\n')}\n\n` : ''}${facts.additionalHelp.low.length > 0 ? `LONG-TERM SUPPORT:\n${facts.additionalHelp.low.map(rec => `• ${rec.area}: ${rec.help} (Contact: ${rec.agency})`).join('\n')}\n\n` : ''}
+
+GOVERNMENT SERVICES AVAILABLE:
+${facts.additionalHelp.governmentServices.map(service => `• ${service}`).join('\n')}
+
+FOLLOW-UP ACTIONS:
+${facts.additionalHelp.followUpActions.map(action => `• ${action}`).join('\n')}
 
 My constituent is willing to work with you in any way possible to resolve this matter and would appreciate any guidance on how to proceed.
 

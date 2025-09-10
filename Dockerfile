@@ -1,5 +1,5 @@
 FROM python:3.11-slim
-ARG CACHE_BUST=5
+ARG CACHE_BUST=6
 
 WORKDIR /app
 
