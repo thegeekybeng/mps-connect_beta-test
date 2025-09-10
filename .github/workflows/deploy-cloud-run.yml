@@ -79,6 +79,14 @@ jobs:
           : "${REPO:?Missing ARTIFACT_REPO (or default) secret}"
           test -f env.yaml || { echo "env.yaml missing in repo root"; exit 1; }
 
+      - name: Require auth configuration (WIF or SA key)
+        run: |
+          if [ -z "${WIF_PROVIDER}" ] && [ -z "${SA_KEY}" ]; then
+            echo "ERROR: No GCP auth configured." >&2
+            echo "Set either (GCP_WORKLOAD_IDENTITY_PROVIDER + GCP_SERVICE_ACCOUNT) or GCP_SA_KEY in GitHub secrets." >&2
+            exit 1
+          fi
+
       - name: Budget / deploy guard
         id: budget
         env:
