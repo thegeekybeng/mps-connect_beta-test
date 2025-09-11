@@ -5,6 +5,7 @@ import sys
 import json
 import logging
 from typing import List, Dict, Any, Optional, Tuple
+import time
 from dataclasses import dataclass
 import threading
 
@@ -15,16 +16,67 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from pydantic import BaseModel  # type: ignore[attr-defined]
 
-# Security imports
+# Security imports (graceful fallbacks if not present)
 # pylint: disable=import-error
-from security.middleware import (  # type: ignore
-    SecurityMiddleware,
-    CORSecurityMiddleware,
-    ContentSecurityMiddleware,
-)
+try:
+    from security.middleware import (  # type: ignore
+        SecurityMiddleware,
+        CORSecurityMiddleware,
+        ContentSecurityMiddleware,
+    )
+except Exception:  # pragma: no cover
+
+    class SecurityMiddleware:  # type: ignore
+        def __init__(self, *args, **kwargs):
+            pass
+
+    class CORSecurityMiddleware:  # type: ignore
+        def __init__(self, *args, **kwargs):
+            pass
+
+    class ContentSecurityMiddleware:  # type: ignore
+        def __init__(self, *args, **kwargs):
+            pass
+
 
 # pylint: disable=import-error
 from database.connection import get_db  # type: ignore
+from sqlalchemy.orm import Session  # type: ignore
+from security.audit import log_api_access  # type: ignore
+
+# Simple in-memory rate limit (per IP, per endpoint)
+_RATE_BUCKETS: Dict[str, Tuple[float, int]] = {}
+_RATE_WINDOW_SECONDS = 60.0
+_RATE_MAX_REQUESTS = 60
+
+
+def _rate_check(ip: Optional[str], endpoint: str) -> bool:
+    import time
+
+    if not ip:
+        return True
+    key = f"{endpoint}:{ip}"
+    now = time.time()
+    window_start, count = _RATE_BUCKETS.get(key, (now, 0))
+    if now - window_start > _RATE_WINDOW_SECONDS:
+        _RATE_BUCKETS[key] = (now, 1)
+        return True
+    count += 1
+    _RATE_BUCKETS[key] = (window_start, count)
+    return count <= _RATE_MAX_REQUESTS
+
+
+def _is_staff(req: Request) -> bool:
+    """Heuristic staff check without enforcing auth.
+    Accepts either X-User-Role: mp_staff/admin or X-Staff-Mode: true.
+    If absent, treat as citizen (no confidences).
+    """
+    role = (req.headers.get("X-User-Role") or "").lower()
+    if role in ("mp_staff", "admin"):
+        return True
+    staff_mode = (req.headers.get("X-Staff-Mode") or "").lower() in ("1", "true", "yes")
+    return staff_mode
+
 
 # Gemini AI Integration
 try:
@@ -512,6 +564,72 @@ class ConfidenceBreakdown(BaseModel):
     risk_level: str  # "low", "medium", "high"
 
 
+# LLM-Guided Chat Models
+class ChatMessage(BaseModel):
+    """Individual chat message."""
+
+    role: str  # "user" or "assistant"
+    content: str
+    timestamp: str
+    language: Optional[str] = None
+
+
+class ChatSession(BaseModel):
+    """Chat session data."""
+
+    session_id: str
+    messages: List[ChatMessage]
+    context: Dict[str, Any]
+    language: str = "en"
+    confidence: float = 0.0
+    facts_extracted: List[Dict[str, Any]] = []
+    suggested_agencies: List[Dict[str, Any]] = []
+
+
+class ChatRequest(BaseModel):
+    """Request for chat interaction."""
+
+    session_id: str
+    message: str
+    language: Optional[str] = None
+    context: Optional[Dict[str, Any]] = None
+
+
+class ChatResponse(BaseModel):
+    """Response from chat system."""
+
+    success: bool
+    message: str
+    language: str
+    confidence: float
+    facts_extracted: List[Dict[str, Any]]
+    suggested_agencies: List[Dict[str, Any]]
+    next_question: Optional[str] = None
+    is_complete: bool = False
+    archival_english: Optional[str] = None
+    missing_facts: List[str] = []
+    error: Optional[str] = None
+
+
+class FactChecklistRequest(BaseModel):
+    """Request for fact checklist review."""
+
+    session_id: str
+    facts: List[Dict[str, Any]]
+    corrections: Optional[Dict[str, str]] = None
+
+
+class FactChecklistResponse(BaseModel):
+    """Response for fact checklist."""
+
+    success: bool
+    reviewed_facts: List[Dict[str, Any]]
+    confidence: float
+    ready_for_letter: bool
+    missing_facts: List[str] = []
+    error: Optional[str] = None
+
+
 # Gemini AI Integration Models
 class CaseAnalysisRequest(BaseModel):
     """Request model for case analysis."""
@@ -732,6 +850,280 @@ def mount_routes(prefix: str = ""):
         if pi.return_confidence_breakdown:
             result["confidence_breakdown"] = confidence_breakdowns  # type: ignore[assignment]
         return result
+
+
+# LLM-Guided Chat Endpoints
+@app.post("/api/chat/start", dependencies=[Depends(require_key)])
+async def start_chat_session(
+    request: ChatRequest, http_req: Request, db: Session = Depends(get_db)
+):
+    """Start a new LLM-guided chat session."""
+    if not GEMINI_AVAILABLE:
+        raise HTTPException(status_code=503, detail="Gemini AI not available")
+
+    gemini = get_gemini_integration()
+    if not gemini:
+        raise HTTPException(
+            status_code=503, detail="Gemini integration not initialized"
+        )
+
+    start_time = time.monotonic()
+    if not _rate_check(
+        http_req.client.host if http_req.client else None, str(http_req.url.path)
+    ):
+        raise HTTPException(status_code=429, detail="Too Many Requests")
+    if not _rate_check(
+        http_req.client.host if http_req.client else None, str(http_req.url.path)
+    ):
+        raise HTTPException(status_code=429, detail="Too Many Requests")
+    if not _rate_check(
+        http_req.client.host if http_req.client else None, str(http_req.url.path)
+    ):
+        raise HTTPException(status_code=429, detail="Too Many Requests")
+    # Basic per-IP rate limiting
+    if not _rate_check(
+        http_req.client.host if http_req.client else None, str(http_req.url.path)
+    ):
+        raise HTTPException(status_code=429, detail="Too Many Requests")
+    try:
+        # Initialize chat session with LLM
+        response = await gemini.start_guided_chat(
+            session_id=request.session_id,
+            initial_message=request.message,
+            language=request.language or "en",
+            context=request.context or {},
+        )
+        # Role-based redaction: hide confidences for citizens
+        if not _is_staff(http_req):
+            response = dict(response)
+            response["confidence"] = 0.0
+        resp_model = ChatResponse(**response)
+        try:
+            log_api_access(
+                db=db,
+                user_id=None,
+                endpoint=str(http_req.url.path),
+                method=http_req.method,
+                status_code=200 if resp_model.success else 500,
+                response_time_ms=int((time.monotonic() - start_time) * 1000),
+                ip_address=http_req.client.host if http_req.client else None,
+                user_agent=http_req.headers.get("user-agent"),
+            )
+        except Exception:
+            pass
+        return resp_model
+    except Exception as e:
+        logger.error(f"Error starting chat session: {e}")
+        resp_model = ChatResponse(
+            success=False,
+            message="Sorry, I couldn't start the chat session. Please try again.",
+            language=request.language or "en",
+            confidence=0.0,
+            facts_extracted=[],
+            suggested_agencies=[],
+            error=str(e),
+        )
+        try:
+            log_api_access(
+                db=db,
+                user_id=None,
+                endpoint=str(http_req.url.path),
+                method=http_req.method,
+                status_code=500,
+                response_time_ms=int((time.monotonic() - start_time) * 1000),
+                ip_address=http_req.client.host if http_req.client else None,
+                user_agent=http_req.headers.get("user-agent"),
+            )
+        except Exception:
+            pass
+        return resp_model
+
+
+@app.post("/api/chat/continue", dependencies=[Depends(require_key)])
+async def continue_chat(
+    request: ChatRequest, http_req: Request, db: Session = Depends(get_db)
+):
+    """Continue an existing chat session with adaptive questioning."""
+    if not GEMINI_AVAILABLE:
+        raise HTTPException(status_code=503, detail="Gemini AI not available")
+
+    gemini = get_gemini_integration()
+    if not gemini:
+        raise HTTPException(
+            status_code=503, detail="Gemini integration not initialized"
+        )
+
+    start_time = time.monotonic()
+    try:
+        # Continue chat with LLM-guided adaptive questioning
+        response = await gemini.continue_guided_chat(
+            session_id=request.session_id,
+            message=request.message,
+            language=request.language or "en",
+            context=request.context or {},
+        )
+        if not _is_staff(http_req):
+            response = dict(response)
+            response["confidence"] = 0.0
+        resp_model = ChatResponse(**response)
+        try:
+            log_api_access(
+                db=db,
+                user_id=None,
+                endpoint=str(http_req.url.path),
+                method=http_req.method,
+                status_code=200 if resp_model.success else 500,
+                response_time_ms=int((time.monotonic() - start_time) * 1000),
+                ip_address=http_req.client.host if http_req.client else None,
+                user_agent=http_req.headers.get("user-agent"),
+            )
+        except Exception:
+            pass
+        return resp_model
+    except Exception as e:
+        logger.error(f"Error continuing chat: {e}")
+        resp_model = ChatResponse(
+            success=False,
+            message="Sorry, I couldn't process your message. Please try again.",
+            language=request.language or "en",
+            confidence=0.0,
+            facts_extracted=[],
+            suggested_agencies=[],
+            error=str(e),
+        )
+        try:
+            log_api_access(
+                db=db,
+                user_id=None,
+                endpoint=str(http_req.url.path),
+                method=http_req.method,
+                status_code=500,
+                response_time_ms=int((time.monotonic() - start_time) * 1000),
+                ip_address=http_req.client.host if http_req.client else None,
+                user_agent=http_req.headers.get("user-agent"),
+            )
+        except Exception:
+            pass
+        return resp_model
+
+
+@app.post("/api/chat/facts-checklist", dependencies=[Depends(require_key)])
+async def review_facts_checklist(
+    request: FactChecklistRequest, http_req: Request, db: Session = Depends(get_db)
+):
+    """Review and validate extracted facts before letter generation."""
+    if not GEMINI_AVAILABLE:
+        raise HTTPException(status_code=503, detail="Gemini AI not available")
+
+    gemini = get_gemini_integration()
+    if not gemini:
+        raise HTTPException(
+            status_code=503, detail="Gemini integration not initialized"
+        )
+
+    start_time = time.monotonic()
+    try:
+        # Review facts with LLM
+        response = await gemini.review_facts_checklist(
+            session_id=request.session_id,
+            facts=request.facts,
+            corrections=request.corrections or {},
+        )
+        resp_model = FactChecklistResponse(**response)
+        try:
+            log_api_access(
+                db=db,
+                user_id=None,
+                endpoint=str(http_req.url.path),
+                method=http_req.method,
+                status_code=200 if resp_model.success else 500,
+                response_time_ms=int((time.monotonic() - start_time) * 1000),
+                ip_address=http_req.client.host if http_req.client else None,
+                user_agent=http_req.headers.get("user-agent"),
+            )
+        except Exception:
+            pass
+        return resp_model
+    except Exception as e:
+        logger.error(f"Error reviewing facts checklist: {e}")
+        resp_model = FactChecklistResponse(
+            success=False,
+            reviewed_facts=[],
+            confidence=0.0,
+            ready_for_letter=False,
+            error=str(e),
+        )
+        try:
+            log_api_access(
+                db=db,
+                user_id=None,
+                endpoint=str(http_req.url.path),
+                method=http_req.method,
+                status_code=500,
+                response_time_ms=int((time.monotonic() - start_time) * 1000),
+                ip_address=http_req.client.host if http_req.client else None,
+                user_agent=http_req.headers.get("user-agent"),
+            )
+        except Exception:
+            pass
+        return resp_model
+
+
+@app.post("/api/chat/generate-letter", dependencies=[Depends(require_key)])
+async def generate_letter_from_chat(
+    request: ChatRequest, http_req: Request, db: Session = Depends(get_db)
+):
+    """Generate letter from completed chat session."""
+    if not GEMINI_AVAILABLE:
+        raise HTTPException(status_code=503, detail="Gemini AI not available")
+
+    gemini = get_gemini_integration()
+    if not gemini:
+        raise HTTPException(
+            status_code=503, detail="Gemini integration not initialized"
+        )
+
+    start_time = time.monotonic()
+    try:
+        # Generate letter from chat session
+        response = await gemini.generate_letter_from_chat(
+            session_id=request.session_id,
+            language=request.language or "en",
+            context=request.context or {},
+        )
+        # No redaction in final letter payload; confidences are part of staff UI only
+        resp = GeminiResponse(success=True, data=response, model_used="pro")
+        try:
+            log_api_access(
+                db=db,
+                user_id=None,
+                endpoint=str(http_req.url.path),
+                method=http_req.method,
+                status_code=200,
+                response_time_ms=int((time.monotonic() - start_time) * 1000),
+                ip_address=http_req.client.host if http_req.client else None,
+                user_agent=http_req.headers.get("user-agent"),
+            )
+        except Exception:
+            pass
+        return resp
+    except Exception as e:
+        logger.error(f"Error generating letter from chat: {e}")
+        resp = GeminiResponse(success=False, error=str(e), model_used="pro")
+        try:
+            log_api_access(
+                db=db,
+                user_id=None,
+                endpoint=str(http_req.url.path),
+                method=http_req.method,
+                status_code=500,
+                response_time_ms=int((time.monotonic() - start_time) * 1000),
+                ip_address=http_req.client.host if http_req.client else None,
+                user_agent=http_req.headers.get("user-agent"),
+            )
+        except Exception:
+            pass
+        return resp
 
 
 # Gemini AI Integration Endpoints

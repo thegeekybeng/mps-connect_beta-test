@@ -56,20 +56,22 @@ Git remote: Not available from current shell (path quoting issue). Please run `g
 
 ## Outstanding / Not Yet Addressed
 
-- **Production Demo Deployment (Priority)**
+- **LLM-Guided Adaptive Chat System (Priority)**
+
+  - **Phase 1: Core LLM Integration** - Implement adaptive fact-finding with semantic recognition and NLP for Singlish/multilingual understanding
+  - **Phase 2: Municipal Flow Implementation** - Add targeted municipal nuisance flow (noise/pickleball) with dynamic questioning and agency routing
+  - **Phase 3: Multilingual Support** - Auto-detect and respond in user language (English, Mandarin, Malay, Tamil) with formal English archival copy
+  - **Phase 4: Security & Governance** - Implement PII encryption (KMS envelope), Secret Manager integration, audit logging, role-based access controls
+  - **Phase 5: UX Enhancement** - Add "What I understood" editable checklist, point-form Town Council letters, confidence scoring for staff only
+  - **Phase 6: Cost & Performance** - Implement cost/latency controls, quick action chips, golden scripts for evaluation
+
+- **Production Demo Deployment**
 
   - **Phase 1: Database Setup** - Set up PostgreSQL database with encryption, audit logging tables, data retention policies
   - **Phase 2: Security Module** - TLS encryption for all connections, environment variable security, basic authentication system
   - **Phase 3: Governance Module** - Immutable audit logs, action tracking system, data lineage recording, compliance reporting
   - **Phase 4: Docker Deployment** - Containerize frontend and backend, Docker Compose for local development
   - **Phase 5: Hosting Setup** - Deploy backend to Render and frontend to GitHub Pages, with monitoring and health checks
-
-- **Chat Feature Advanced Improvements**
-
-  - **Phase 1: Dynamic Question Generation** - AI-powered question selection based on case type, adaptive follow-up questions, context-sensitive ordering
-  - **Phase 2: Enhanced Intelligence** - Natural language processing, multi-turn conversation memory, intelligent response validation
-  - **Phase 3: Specialized Flows** - Agency-specific question sets, case-type-specific workflows, legal vs. administrative handling
-  - **Phase 4: Advanced Data Extraction** - Named entity recognition, relationship extraction, structured data validation
 
 - **Approval Workflow Controls**
 
@@ -97,6 +99,48 @@ Git remote: Not available from current shell (path quoting issue). Please run `g
 - **Code quality improvements** → ensures maintainability and reduces technical debt; supports long-term development
 - **Production deployment readiness** → enables immediate deployment to live environment; supports real-world testing
 - **Comprehensive documentation** → ensures knowledge transfer and maintenance; supports team collaboration
+
+## LLM-Guided Chat System - Technical Specifications
+
+### **Core Intelligence Features**
+
+- **Adaptive Fact-Finding**: No fixed workflow; LLM dynamically plans questions based on intent detection
+- **Semantic Recognition**: Understanding of Singlish, colloquialisms, and Singaporean context
+- **Multilingual Support**: Auto-detect and respond in English, Mandarin, Malay, Tamil
+- **Confidence Scoring**: Internal confidence metrics visible only to staff roles
+- **Agency Routing**: Weighted suggestions for appropriate government agencies (Town Council, NEA, SPF, etc.)
+
+### **Language Processing**
+
+- **Input Languages**: English, Mandarin, Malay, Tamil, Singlish
+- **Output Languages**: Match user input language for responses
+- **Archival Language**: All conversations stored in formal English for transparency
+- **Translation**: LLM-based translation with explainable reconciliation
+- **Cultural Sensitivity**: Respectful addressing by surname (Malays/Indians with first name + salutation)
+
+### **Security & Compliance**
+
+- **PII Encryption**: KMS envelope encryption for all personal data
+- **Secret Management**: Google Secret Manager integration
+- **Audit Logging**: Complete conversation and decision trails
+- **Role-Based Access**: Different visibility levels for citizens vs. staff
+- **Data Retention**: Session-based with historical reference capability
+- **PDPA Compliance**: Singapore data protection standards
+
+### **UX & Workflow**
+
+- **"What I Understood" Checklist**: Editable fact summary before letter generation
+- **Point-Form Letters**: Professional, concise Town Council correspondence
+- **Quick Action Chips**: Suggested responses for missing information
+- **Progress Indicators**: Keep users engaged during processing
+- **Agency Justification**: Explain why specific agencies are recommended
+
+### **Cost & Performance Controls**
+
+- **Model Selection**: Preview vs. Pro models based on complexity
+- **Caching Strategy**: Reduce redundant API calls
+- **Turn Limits**: Maximum conversation length before summarization
+- **Latency Targets**: Sub-2-second response times where possible
 
 ## Production Demo Deployment - Technical Specifications
 
@@ -158,7 +202,16 @@ sessions, permissions, access_logs
 
 ## Immediate Next Steps
 
-1. **Production Demo Deployment (Priority)**
+1. **LLM-Guided Adaptive Chat System (Status: COMPLETE)**
+
+   - ✅ Core LLM integration: adaptive fact-finding, semantic recognition, early-stop when complete
+   - ✅ Municipal nuisance flow hints (noise/pickleball) and agency routing suggestions
+   - ✅ Multilingual handling with archival English summary (`archival_english`)
+   - ✅ Security & governance: audit access logs on chat endpoints; staff-only confidence in UI; backend redaction for non-staff
+   - ✅ UX: "What I understood" checklist; point-form letter generation; quick chips for missing facts
+   - ✅ Cost & performance: short‑TTL in‑memory cache; per‑IP rate limiting
+
+2. **Production Demo Deployment**
 
    - **Phase 1: Database Setup** - Set up free PostgreSQL database with encryption and audit logging
    - **Phase 2: Security Module** - Implement TLS encryption and authentication
@@ -166,23 +219,18 @@ sessions, permissions, access_logs
    - **Phase 4: Docker Deployment** - Containerize application for easy deployment
    - **Phase 5: Hosting Setup** - Deploy to Render + GitHub Pages with monitoring
 
-2. **Chat Feature Advanced Improvements**
-
-   - **Phase 1: Dynamic Question Generation** - Implement AI-powered question selection and adaptive follow-ups
-   - **Phase 2: Enhanced Intelligence** - Add NLP capabilities and multi-turn conversation memory
-   - **Phase 3: Specialized Flows** - Create agency-specific question sets and case-type workflows
-   - **Phase 4: Advanced Data Extraction** - Implement NER and relationship extraction
-
 3. **Testing & Validation**
 
    - User acceptance testing with MP office staff
    - Performance testing with various case types
    - Integration testing with existing workflows
+   - Golden script testing with Singaporean scenarios
 
-4. **Optional Future Enhancements**
-   - Advanced AI content generation
-   - Quality assurance automation
-   - External system integration
+4. **Optional / Future Enhancements**
+   - Backend role-based redaction tied to JWT/session (hard enforcement) in addition to current header heuristic
+   - Analytics/golden scripts: turns, early-ends, letters; scenario regression suite
+   - Broader rate limiting/backoff and timeout tuning; caching metrics
+   - External integrations as needed
 
 ## Verification
 

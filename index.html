@@ -598,177 +598,370 @@ document.addEventListener('input', (e) => {
   }
 });
 
+// LLM-Guided Chat System
+let chatSession = {
+  sessionId: null,
+  language: 'en',
+  context: {},
+  facts: [],
+  agencies: [],
+  isComplete: false
+};
+
 function startGuidedChat() {
-  state.chatData = {};
-  state.chatStep = 0;
-  state.chatContext = {
-    urgency: false,
-    financialHardship: false,
-    category: null,
-    emotionalTone: 'neutral',
-    sentimentScore: 0,
-    stressLevel: 'low',
-    confidenceLevel: 'medium',
-    previousResponses: [],
-    keyConcerns: [],
-    suggestedResources: []
-  };
+  // Generate unique session ID
+  chatSession.sessionId = 'chat_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+  chatSession.language = 'en';
+  chatSession.context = {};
+  chatSession.facts = [];
+  chatSession.agencies = [];
+  chatSession.isComplete = false;
   
-  state.chatQuestions = [
-    {
-      question: "Hi there! I'm MPS Connect, your friendly MP Office assistant. I'm here to help you with whatever government matter you're dealing with. I know these things can be quite stressful, so don't worry - we'll work through this together. What's the main issue you'd like help with today?",
-      field: "issue_type",
-      type: "open",
-      acknowledgments: [
-        "I understand this can be frustrating. Let me help you with that.",
-        "That sounds challenging. I'm here to support you through this.",
-        "I can see this is important to you. Let's work on getting this sorted out."
-      ]
-    },
-    {
-      question: "Thank you for sharing that with me. Could you tell me a bit more about your specific situation? The more details you can provide, the better I can assist you.",
-      field: "situation",
-      type: "open",
-      acknowledgments: [
-        "I appreciate you taking the time to explain this to me.",
-        "Thank you for being so detailed. This helps me understand better.",
-        "I can see this is affecting you significantly. Let's get this resolved."
-      ]
-    },
-    {
-      question: "I understand. Which government agency or department is this related to? For example, is it Traffic Police, HDB, IRAS, MOM, or another agency? This helps me direct you to the right resources.",
-      field: "agency",
-      type: "open",
-      acknowledgments: [
-        "Good, that helps me understand which department we need to work with.",
-        "Perfect, I know exactly who we need to contact for this matter.",
-        "Thank you, that gives me a clear direction on how to help you."
-      ]
-    },
-    {
-      question: "I understand this might be a sensitive question, but are you currently working? This helps me understand your situation better so I can suggest the most appropriate assistance options.",
-      field: "employment_status",
-      type: "yesno",
-      acknowledgments: {
-        yes: "Thank you for sharing that. Having stable employment can sometimes help with certain applications.",
-        no: "I understand. Being between jobs can make things more challenging, but there are still options available to help you."
-      }
-    },
-    {
-      question: "I know money matters can be stressful to discuss, but are you experiencing any financial difficulties that are making this situation harder to handle? This information helps me suggest the best support options for you.",
-      field: "financial_hardship",
-      type: "yesno",
-      acknowledgments: {
-        yes: "I understand this is a difficult time financially. There are several assistance programs that might be able to help you.",
-        no: "That's good to hear. Having financial stability can make navigating these processes easier."
-      }
-    },
-    {
-      question: "Is this matter urgent or time-sensitive? I want to make sure we prioritize this correctly and get you the help you need as quickly as possible.",
-      field: "urgency",
-      type: "yesno",
-      acknowledgments: {
-        yes: "I understand this is urgent. Let me make sure we handle this with the priority it deserves.",
-        no: "Good, that gives us time to make sure we get everything right and explore all available options."
-      }
-    },
-    {
-      question: "Do you have any supporting documents, reference numbers, or paperwork related to this matter? Even if you don't have everything, any information you can provide will be helpful.",
-      field: "supporting_docs",
-      type: "open",
-      acknowledgments: [
-        "Great! Having documentation will definitely help strengthen your case.",
-        "No worries if you don't have everything. We can work with what you have.",
-        "That's helpful information. Every bit of documentation makes a difference."
-      ]
-    },
-    {
-      question: "Is there anything else you'd like me to know about your situation? Sometimes the small details can make a big difference in how we approach your case.",
-      field: "additional_info",
-      type: "open",
-      acknowledgments: [
-        "Thank you for sharing that additional information. It really helps me understand your full situation.",
-        "I appreciate you being so thorough. This gives me a complete picture of what you're dealing with.",
-        "That's very helpful. Every detail you've provided will help me assist you better."
-      ]
-    }
-  ];
-  
+  // Clear chat messages
   clearChatMessages();
-  askNextQuestion();
+  
+  // Show initial message
+  addChatMessage('assistant', "Hi there! I'm MPS Connect, your friendly MP Office assistant. I'm here to help you with whatever government matter you're dealing with. I know these things can be quite stressful, so don't worry - we'll work through this together. What's the main issue you'd like help with today?");
+  
+  // Enable chat input
+  const chatInput = qs('chatInput');
+  const sendBtn = qs('btnSendChat');
+  if (chatInput && sendBtn) {
+    chatInput.disabled = false;
+    sendBtn.disabled = false;
+    chatInput.focus();
+  }
 }
 
-function askNextQuestion() {
-  // Smart question skipping
-  while (state.chatStep < state.chatQuestions.length && shouldSkipQuestion(state.chatQuestions[state.chatStep], state.chatStep)) {
-    state.chatStep++;
-  }
+async function sendChatMessage() {
+  const chatInput = qs('chatInput');
+  const message = chatInput.value.trim();
   
-  if (state.chatStep >= state.chatQuestions.length) {
-    completeGuidedChat();
-    return;
-  }
+  if (!message || chatSession.isComplete) return;
   
-  const question = state.chatQuestions[state.chatStep];
+  // Add user message to chat
+  addChatMessage('user', message);
   
-  // Update progress
-  updateChatProgress();
-  
-  // Add emotional context to questions
-  let contextualQuestion = question.question;
-  if (state.chatContext.emotionalTone === 'stressed') {
-    contextualQuestion = "I can see this is really frustrating for you. " + contextualQuestion;
-  } else if (state.chatContext.emotionalTone === 'worried') {
-    contextualQuestion = "I understand your concerns. " + contextualQuestion;
-  } else if (state.chatContext.emotionalTone === 'positive') {
-    contextualQuestion = "I'm glad you're feeling optimistic about this. " + contextualQuestion;
-  }
+  // Clear input and disable
+  chatInput.value = '';
+  chatInput.disabled = true;
+  const sendBtn = qs('btnSendChat');
+  if (sendBtn) sendBtn.disabled = true;
   
   // Show typing indicator
   showTypingIndicator();
   
-  // Simulate typing delay for more natural feel
-  setTimeout(() => {
+  try {
+    // Call LLM-guided chat API
+    const response = await callLLMChatAPI(message);
+    
+    // Hide typing indicator
     hideTypingIndicator();
-    addChatMessage('assistant', contextualQuestion);
     
-    // Show quick actions
-    showQuickActions(question);
-    
-    // Enable input
-    const chatInput = qs('chatInput');
-    const sendBtn = qs('btnSendChat');
-    const sendText = qs('sendText');
-    const sendingText = qs('sendingText');
-    
-    chatInput.disabled = false;
-    sendBtn.disabled = false;
-    sendText.classList.remove('hidden');
-    sendingText.classList.add('hidden');
-    
-    // Show character count for open questions
-    if (question.type === 'open') {
-      const charCount = qs('charCount');
-      if (charCount) {
-        charCount.classList.remove('hidden');
-        updateCharCount();
+    if (response.success) {
+      // Add assistant response
+      addChatMessage('assistant', response.message);
+      
+      // Update session data
+      chatSession.language = response.language;
+      chatSession.facts = [...chatSession.facts, ...response.facts_extracted];
+      chatSession.agencies = response.suggested_agencies;
+      chatSession.isComplete = response.is_complete;
+      
+      // Show facts and agencies if available
+      if (response.facts_extracted.length > 0) {
+        showExtractedFacts(response.facts_extracted);
       }
+      
+      if (response.suggested_agencies.length > 0) {
+        showSuggestedAgencies(response.suggested_agencies);
+      }
+      
+      // Optional: quick chips for missing facts if provided
+      if (Array.isArray(response.missing_facts) && response.missing_facts.length > 0) {
+        showMissingFactChips(response.missing_facts);
+      }
+      
+      // If conversation is complete, show next steps
+      if (response.is_complete) {
+        showChatCompletion();
+      } else {
+        // Re-enable input for next message
+        chatInput.disabled = false;
+        if (sendBtn) sendBtn.disabled = false;
+        chatInput.focus();
+      }
+    } else {
+      // Handle error
+      addChatMessage('assistant', 'I apologize, but I encountered an error processing your message. Please try again.');
+      chatInput.disabled = false;
+      if (sendBtn) sendBtn.disabled = false;
+      chatInput.focus();
+    }
+  } catch (error) {
+    console.error('Chat API error:', error);
+    hideTypingIndicator();
+    addChatMessage('assistant', 'I apologize, but I encountered an error. Please try again.');
+    chatInput.disabled = false;
+    if (sendBtn) sendBtn.disabled = false;
+    chatInput.focus();
+  }
+}
+
+async function callLLMChatAPI(message) {
+  const isFirstMessage = chatSession.facts.length === 0;
+  const endpoint = isFirstMessage ? '/api/chat/start' : '/api/chat/continue';
+  
+  const response = await fetch(`${window.API_BASE}${endpoint}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-API-Key': window.API_KEY
+    },
+    body: JSON.stringify({
+      session_id: chatSession.sessionId,
+      message: message,
+      language: chatSession.language,
+      context: chatSession.context
+    })
+  });
+  
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`);
+  }
+  
+  return await response.json();
+}
+
+function showExtractedFacts(facts) {
+  const factsContainer = qs('chatMessages');
+  if (!factsContainer) return;
+  
+  const factsDiv = document.createElement('div');
+  factsDiv.className = 'mt-3 p-3 bg-blue-50 rounded-lg border-l-4 border-blue-400';
+  factsDiv.innerHTML = `
+    <div class="text-sm font-medium text-blue-800 mb-2">Key Information I've Gathered:</div>
+    <div class="space-y-1">
+      ${facts.map(fact => `
+        <div class="text-sm text-blue-700">
+          <span class="font-medium">${fact.type}:</span> ${fact.content}
+        </div>
+      `).join('')}
+    </div>
+  `;
+  
+  factsContainer.appendChild(factsDiv);
+  factsContainer.scrollTop = factsContainer.scrollHeight;
+}
+
+// Optional quick chips: call with an array of strings describing missing items
+function showMissingFactChips(missingFacts) {
+  if (!Array.isArray(missingFacts) || missingFacts.length === 0) return;
+  const chatMessages = qs('chatMessages');
+  if (!chatMessages) return;
+  
+  const chips = document.createElement('div');
+  chips.className = 'mt-2 p-2 bg-amber-50 rounded border border-amber-200';
+  chips.innerHTML = `
+    <div class="text-xs text-amber-700 mb-1">Missing info I still need (tap to fill):</div>
+    <div class="flex flex-wrap gap-2">
+      ${missingFacts.map(m => `<button class="px-2 py-1 text-xs bg-white border rounded hover:bg-amber-100" data-missing="${m}">${m}</button>`).join('')}
+    </div>
+  `;
+  chatMessages.appendChild(chips);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+  
+  chips.querySelectorAll('button[data-missing]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const chatInput = qs('chatInput');
+      if (!chatInput) return;
+      // Prefill a polite prompt requesting the missing fact
+      const item = btn.getAttribute('data-missing');
+      chatInput.value = `Regarding ${item}, it is: `;
+      chatInput.focus();
+    });
+  });
+}
+
+function showSuggestedAgencies(agencies) {
+  const agenciesContainer = qs('chatMessages');
+  if (!agenciesContainer) return;
+  
+  const agenciesDiv = document.createElement('div');
+  agenciesDiv.className = 'mt-3 p-3 bg-green-50 rounded-lg border-l-4 border-green-400';
+  agenciesDiv.innerHTML = `
+    <div class="text-sm font-medium text-green-800 mb-2">Suggested Government Agencies:</div>
+    <div class="space-y-2">
+      ${agencies.map(agency => `
+        <div class="text-sm text-green-700">
+          <div class="font-medium">${agency.agency}</div>
+          <div class="text-xs text-green-600">${agency.reason}</div>
+          <div class="text-xs text-gray-600">Priority: ${agency.priority}</div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+  
+  agenciesContainer.appendChild(agenciesDiv);
+  agenciesContainer.scrollTop = agenciesContainer.scrollHeight;
+}
+
+function showChatCompletion() {
+  const chatContainer = qs('chatContainer');
+  if (!chatContainer) return;
+  
+  const completionDiv = document.createElement('div');
+  completionDiv.className = 'mt-4 p-4 bg-green-100 rounded-lg border border-green-300';
+  completionDiv.innerHTML = `
+    <div class="text-green-800 font-medium mb-2">Great! I have enough information to help you.</div>
+    <div class="text-sm text-green-700 mb-3">Based on our conversation, I can now generate a professional letter for your case.</div>
+    <div class="flex gap-2">
+      <button id="btnReviewFacts" class="px-3 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700">
+        Review Information
+      </button>
+      <button id="btnGenerateLetter" class="px-3 py-2 bg-green-600 text-white rounded text-sm hover:bg-green-700">
+        Generate Letter
+      </button>
+    </div>
+  `;
+  
+  chatContainer.appendChild(completionDiv);
+  
+  // Add event listeners
+  const reviewBtn = completionDiv.querySelector('#btnReviewFacts');
+  const generateBtn = completionDiv.querySelector('#btnGenerateLetter');
+  
+  if (reviewBtn) {
+    reviewBtn.addEventListener('click', showFactsChecklist);
+  }
+  
+  if (generateBtn) {
+    generateBtn.addEventListener('click', generateLetterFromChat);
+  }
+}
+
+function showFactsChecklist() {
+  // This will show the "What I understood" checklist
+  const checklistDiv = document.createElement('div');
+  checklistDiv.className = 'mt-4 p-4 bg-yellow-50 rounded-lg border border-yellow-300';
+  checklistDiv.innerHTML = `
+    <div class="text-yellow-800 font-medium mb-3">What I Understood - Please Review:</div>
+    <div class="space-y-2" id="factsChecklist">
+      ${chatSession.facts.map((fact, index) => `
+        <div class="flex items-center gap-2">
+          <input type="checkbox" id="fact_${index}" checked class="rounded">
+          <label for="fact_${index}" class="text-sm text-yellow-700">${fact.content}</label>
+          <button class="text-xs text-blue-600 hover:text-blue-800" onclick="editFact(${index})">Edit</button>
+        </div>
+      `).join('')}
+    </div>
+    <div class="mt-3 flex gap-2">
+      <button id="btnConfirmFacts" class="px-3 py-2 bg-green-600 text-white rounded text-sm hover:bg-green-700">
+        Confirm & Generate Letter
+      </button>
+      <button id="btnCancelFacts" class="px-3 py-2 bg-gray-500 text-white rounded text-sm hover:bg-gray-600">
+        Cancel
+      </button>
+    </div>
+  `;
+  
+  const chatContainer = qs('chatContainer');
+  if (chatContainer) {
+    chatContainer.appendChild(checklistDiv);
+  }
+  
+  // Add event listeners
+  const confirmBtn = checklistDiv.querySelector('#btnConfirmFacts');
+  const cancelBtn = checklistDiv.querySelector('#btnCancelFacts');
+  
+  if (confirmBtn) {
+    confirmBtn.addEventListener('click', generateLetterFromChat);
+  }
+  
+  if (cancelBtn) {
+    cancelBtn.addEventListener('click', () => checklistDiv.remove());
+  }
+}
+
+async function generateLetterFromChat() {
+  try {
+    const response = await fetch(`${window.API_BASE}/api/chat/generate-letter`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-API-Key': window.API_KEY
+      },
+      body: JSON.stringify({
+        session_id: chatSession.sessionId,
+        language: chatSession.language,
+        context: chatSession.context
+      })
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
     
-    chatInput.focus();
-  }, 800 + Math.random() * 400); // Random delay between 800-1200ms
-  
-  // Set placeholder based on question type and context
-  if (question.type === 'yesno') {
-    chatInput.placeholder = 'Type "yes" or "no"';
-  } else if (question.field === 'tf_offence_date') {
-    chatInput.placeholder = 'YYYY-MM-DD format (e.g., 2024-01-15)';
-  } else if (question.field === 'tf_fine_amount') {
-    chatInput.placeholder = 'Amount in SGD (e.g., 200.00)';
-  } else if (question.field === 'tf_demerit_points') {
-    chatInput.placeholder = 'Number of points (e.g., 6)';
+    const result = await response.json();
+    
+    if (result.success) {
+      // Show generated letter
+      showGeneratedLetter(result.data);
   } else {
-    chatInput.placeholder = 'Type your response here...';
+      addChatMessage('assistant', 'I apologize, but I encountered an error generating your letter. Please try again.');
+    }
+  } catch (error) {
+    console.error('Letter generation error:', error);
+    addChatMessage('assistant', 'I apologize, but I encountered an error generating your letter. Please try again.');
+  }
+}
+
+function showGeneratedLetter(letterData) {
+  const letterDiv = document.createElement('div');
+  letterDiv.className = 'mt-4 p-4 bg-white rounded-lg border border-gray-300';
+  letterDiv.innerHTML = `
+    <div class="text-gray-800 font-medium mb-3">Generated Letter:</div>
+    <div class="text-sm text-gray-600 mb-2">
+      <strong>Subject:</strong> ${letterData.subject}
+    </div>
+    <div class="text-sm text-gray-700 whitespace-pre-wrap">${letterData.content}</div>
+    <div class="mt-3 flex gap-2">
+      <button id="btnCopyLetter" class="px-3 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700">
+        Copy Letter
+      </button>
+      <button id="btnDownloadLetter" class="px-3 py-2 bg-green-600 text-white rounded text-sm hover:bg-green-700">
+        Download Letter
+      </button>
+    </div>
+  `;
+  
+  const chatContainer = qs('chatContainer');
+  if (chatContainer) {
+    chatContainer.appendChild(letterDiv);
+  }
+  
+  // Add event listeners
+  const copyBtn = letterDiv.querySelector('#btnCopyLetter');
+  const downloadBtn = letterDiv.querySelector('#btnDownloadLetter');
+  
+  if (copyBtn) {
+    copyBtn.addEventListener('click', () => {
+      navigator.clipboard.writeText(letterData.content);
+      copyBtn.textContent = 'Copied!';
+      setTimeout(() => copyBtn.textContent = 'Copy Letter', 2000);
+    });
+  }
+  
+  if (downloadBtn) {
+    downloadBtn.addEventListener('click', () => {
+      const blob = new Blob([letterData.content], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `MP_Letter_${new Date().toISOString().split('T')[0]}.txt`;
+      a.click();
+      URL.revokeObjectURL(url);
+    });
   }
 }
 
@@ -918,555 +1111,29 @@ function hideCharCount() {
   }
 }
 
-function sendChatMessage() {
-  const chatInput = qs('chatInput');
-  const message = chatInput.value.trim();
-  
-  if (!message) return;
-  
-  // Hide quick actions and character count
-  hideQuickActions();
-  hideCharCount();
-  
-  // Add user message
-  addChatMessage('user', message);
-  
-  // Store response
-  const currentQuestion = state.chatQuestions[state.chatStep];
-  state.chatData[currentQuestion.field] = message;
+// Old sendChatMessage function removed - now using LLM-guided version above
 
-  // Update context for dynamic flow
-  updateChatContext(currentQuestion.field, message);
+// Old completeGuidedChat function removed - now using LLM-guided completion
 
-  // Conditional insertion of Traffic Fines follow-ups
-  const msgLower = message.toLowerCase();
-  const isTrafficHint = (currentQuestion.field === 'agency' && /traffic|lta|tp|police/.test(msgLower))
-    || (currentQuestion.field === 'issue_type' && /(traffic|fine|speed|parking|red\s?light)/.test(msgLower));
-  if (isTrafficHint && !state.chatTrafficAdded) {
-    state.chatTrafficAdded = true;
-    const tfQuestions = [
-      { question: 'I see this is related to traffic matters. Let me gather some specific details to help you better. What type of traffic offence are we dealing with?', field: 'tf_offence_type', type: 'open' },
-      { question: 'When did this offence occur? Please provide the date in YYYY-MM-DD format if possible.', field: 'tf_offence_date', type: 'open' },
-      { question: 'Where did this happen? Please provide the location or road name.', field: 'tf_location', type: 'open' },
-      { question: 'Do you have a notice number or reference from the Traffic Police? This helps me track your case.', field: 'tf_notice_ref', type: 'open' },
-      { question: 'What is the fine amount, if you know it?', field: 'tf_fine_amount', type: 'open' },
-      { question: 'How many demerit points are involved, if any?', field: 'tf_demerit_points', type: 'open' },
-      { question: 'Are you experiencing any financial difficulties that make paying this fine challenging?', field: 'tf_hardship', type: 'open' },
-      { question: 'What would you like to achieve? Are you looking to appeal, request a payment plan, or something else?', field: 'tf_request', type: 'open' }
-    ];
-    // Insert immediately after current step
-    state.chatQuestions.splice(state.chatStep + 1, 0, ...tfQuestions);
-  }
-  
-  // Show sending state
-  const sendBtn = qs('btnSendChat');
-  const sendText = qs('sendText');
-  const sendingText = qs('sendingText');
-  
-  sendBtn.disabled = true;
-  sendText.classList.add('hidden');
-  sendingText.classList.remove('hidden');
-  
-  // Clear input
-  chatInput.value = '';
-  chatInput.disabled = true;
-  
-  // Show acknowledgment before next question
-  setTimeout(() => {
-    showAcknowledgment(currentQuestion, message);
-    setTimeout(() => {
-      // Move to next question with smart branching
-      state.chatStep++;
-      askNextQuestion();
-    }, 1500);
-  }, 800);
-}
+// Old showSummaryConfirmation function removed - now using LLM-guided facts checklist
 
-function completeGuidedChat() {
-  // Hide progress bar and quick actions
-  const progressDiv = qs('chatProgress');
-  if (progressDiv) progressDiv.classList.add('hidden');
-  hideQuickActions();
-  
-  // Show summary confirmation
-  showSummaryConfirmation();
-}
+// Old generateSummaryData function removed - now using LLM-guided facts extraction
 
-function showSummaryConfirmation() {
-  const summaryData = generateSummaryData();
-  
-  const summaryMessage = `Let me summarize what you've told me to make sure I have everything correct:
+// Old proceedWithLetterGeneration function removed - now using LLM-guided letter generation
 
-**Issue Type:** ${summaryData.issue_type || 'Not specified'}
-**Situation:** ${summaryData.situation || 'Not provided'}
-**Agency:** ${summaryData.agency || 'Not specified'}
-**Employment Status:** ${summaryData.employment_status || 'Not specified'}
-**Financial Hardship:** ${summaryData.financial_hardship || 'Not specified'}
-**Urgency:** ${summaryData.urgency || 'Not specified'}
-**Supporting Documents:** ${summaryData.supporting_docs || 'None mentioned'}
-**Additional Info:** ${summaryData.additional_info || 'None provided'}
-
-${summaryData.trafficFines ? `
-**Traffic Fines Details:**
-- Offence Type: ${summaryData.trafficFines.offence_type || '—'}
-- Date: ${summaryData.trafficFines.offence_date || '—'}
-- Location: ${summaryData.trafficFines.location || '—'}
-- Notice Ref: ${summaryData.trafficFines.notice_ref || '—'}
-- Fine Amount: ${summaryData.trafficFines.fine_amount || '—'}
-- Demerit Points: ${summaryData.trafficFines.demerit_points || '—'}
-- Hardship: ${summaryData.trafficFines.hardship || '—'}
-- Request: ${summaryData.trafficFines.request || '—'}
-` : ''}
-
-Does this look correct? If yes, I'll proceed to generate your letter. If you need to make any changes, please let me know what to correct.`;
-
-  addChatMessage('assistant', summaryMessage);
-  
-  // Add confirmation buttons
-  const chatMessages = qs('chatMessages');
-  const confirmationDiv = document.createElement('div');
-  confirmationDiv.className = 'flex justify-start';
-  confirmationDiv.innerHTML = `
-    <div class="bg-white border rounded-lg px-3 py-2 max-w-xs">
-      <div class="text-sm mb-2">Please confirm:</div>
-      <div class="flex gap-2">
-        <button id="confirmSummary" class="px-3 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700">Yes, proceed</button>
-        <button id="editSummary" class="px-3 py-1 text-xs bg-amber-600 text-white rounded hover:bg-amber-700">Edit details</button>
-      </div>
-    </div>
-  `;
-  chatMessages.appendChild(confirmationDiv);
-  chatMessages.scrollTop = chatMessages.scrollHeight;
-  
-  // Add event listeners
-  qs('confirmSummary').addEventListener('click', () => {
-    confirmationDiv.remove();
-    proceedWithLetterGeneration();
-  });
-  
-  qs('editSummary').addEventListener('click', () => {
-    confirmationDiv.remove();
-    addChatMessage('assistant', 'I understand you\'d like to make changes. Please tell me what needs to be corrected, and I\'ll help you update the information.');
-    // Re-enable input for editing
-    const chatInput = qs('chatInput');
-    const sendBtn = qs('btnSendChat');
-    chatInput.disabled = false;
-    sendBtn.disabled = false;
-    chatInput.focus();
-  });
-}
-
-function generateSummaryData() {
-  const data = state.chatData;
-  const summary = {
-    issue_type: data.issue_type,
-    situation: data.situation,
-    agency: data.agency,
-    employment_status: data.employment_status,
-    financial_hardship: data.financial_hardship,
-    urgency: data.urgency,
-    supporting_docs: data.supporting_docs,
-    additional_info: data.additional_info
-  };
-  
-  // Add traffic fines data if available
-  if (state.chatTrafficAdded) {
-    summary.trafficFines = {
-      offence_type: data.tf_offence_type,
-      offence_date: data.tf_offence_date,
-      location: data.tf_location,
-      notice_ref: data.tf_notice_ref,
-      fine_amount: data.tf_fine_amount,
-      demerit_points: data.tf_demerit_points,
-      hardship: data.tf_hardship,
-      request: data.tf_request
-    };
-  }
-  
-  return summary;
-}
-
-function proceedWithLetterGeneration() {
-  // Generate empathetic completion message based on context
-  let completionMessage = 'Perfect! Thank you for confirming all the details. ';
-  if (state.chatContext.emotionalTone === 'stressed') {
-    completionMessage += 'I can see this has been really difficult for you, and I want you to know that we\'re going to do everything we can to help resolve this. ';
-  } else if (state.chatContext.emotionalTone === 'worried') {
-    completionMessage += 'I understand your concerns, and I want to reassure you that we\'re here to support you through this process. ';
-  } else if (state.chatContext.emotionalTone === 'positive') {
-    completionMessage += 'I\'m really glad you\'re feeling optimistic about this. ';
-  }
-  completionMessage += 'MPS Connect is now analyzing your case and will generate the appropriate letter to help you with this matter. This should only take a moment...';
-  
-  addChatMessage('assistant', completionMessage);
-  
-  // Add resource recommendations if available
-  if (state.chatContext.suggestedResources.length > 0) {
-    setTimeout(() => {
-      let resourceMessage = '\n\nI\'ve also identified some additional resources that might be helpful for your situation:\n\n';
-      state.chatContext.suggestedResources.forEach((resource, index) => {
-        resourceMessage += `${index + 1}. **${resource.name}**\n   ${resource.description}\n   ${resource.url}\n\n`;
-      });
-      resourceMessage += 'These resources can provide additional support beyond the letter we\'re generating for you.';
-      addChatMessage('assistant', resourceMessage);
-    }, 2000);
-  }
-  
-  // Add intelligent insights based on context
-  setTimeout(() => {
-    generateIntelligentInsights();
-  }, 3000);
-  
-  // Combine all collected data into case text
-  const caseText = generateCaseTextFromChat();
-  qs('caseText').value = caseText;
-
-  // Sync Traffic Fines answers into slots for validation and letters
-  if (state.chatTrafficAdded) {
-    const d = state.chatData;
-    const s = state.slots.transport.traffic_fines;
-    s.offence_type = d.tf_offence_type || s.offence_type;
-    s.offence_date = d.tf_offence_date || s.offence_date;
-    s.location = d.tf_location || s.location;
-    s.notice_ref = d.tf_notice_ref || s.notice_ref;
-    s.fine_amount = d.tf_fine_amount || s.fine_amount;
-    s.demerit_points = d.tf_demerit_points || s.demerit_points;
-    s.hardship = d.tf_hardship || s.hardship;
-    s.request = d.tf_request || s.request;
-  }
-  
-  // Switch back to single-shot mode and analyze
-  setTimeout(() => {
-    toggleChatMode();
-    predictOnce();
-  }, 2000);
-}
-
-function generateCaseTextFromChat() {
-  const data = state.chatData;
-  let caseText = `Issue Type: ${data.issue_type || 'Not specified'}\n\n`;
-  caseText += `Situation: ${data.situation || 'Not provided'}\n\n`;
-  caseText += `Related Agency: ${data.agency || 'Not specified'}\n\n`;
-  caseText += `Employment Status: ${data.employment_status || 'Not specified'}\n\n`;
-  caseText += `Financial Hardship: ${data.financial_hardship || 'Not specified'}\n\n`;
-  caseText += `Urgency: ${data.urgency || 'Not specified'}\n\n`;
-  caseText += `Supporting Documents: ${data.supporting_docs || 'None mentioned'}\n\n`;
-  caseText += `Additional Information: ${data.additional_info || 'None provided'}`;
-
-  if (state.chatTrafficAdded) {
-    caseText += `\n\nTraffic Fines Details:\n`;
-    caseText += `- Offence Type: ${data.tf_offence_type || '—'}\n`;
-    caseText += `- Offence Date: ${data.tf_offence_date || '—'}\n`;
-    caseText += `- Location: ${data.tf_location || '—'}\n`;
-    caseText += `- Notice Ref: ${data.tf_notice_ref || '—'}\n`;
-    caseText += `- Fine Amount: ${data.tf_fine_amount || '—'}\n`;
-    caseText += `- Demerit Points: ${data.tf_demerit_points || '—'}\n`;
-    caseText += `- Hardship: ${data.tf_hardship || '—'}\n`;
-    caseText += `- Request: ${data.tf_request || '—'}`;
-  }
-  
-  return caseText;
-}
-
-function resetChat() {
-  state.chatData = {};
-  state.chatStep = 0;
-  clearChatMessages();
-  addChatMessage('assistant', 'Chat reset. MPS Connect is starting over...');
-  setTimeout(() => askNextQuestion(), 1000);
-}
+// Old chat functions removed - now using LLM-guided system
 
 function clearChatMessages() {
   qs('chatMessages').innerHTML = '';
 }
 
-function updateChatContext(field, message) {
-  const msgLower = message.toLowerCase();
-  
-  // Store previous response for context memory
-  state.chatContext.previousResponses.push({
-    field: field,
-    message: message,
-    timestamp: Date.now()
-  });
-  
-  // Advanced sentiment analysis
-  const sentimentResult = analyzeSentiment(message);
-  state.chatContext.sentimentScore = sentimentResult.score;
-  state.chatContext.stressLevel = sentimentResult.stressLevel;
-  state.chatContext.emotionalTone = sentimentResult.tone;
-  
-  // Extract key concerns
-  extractKeyConcerns(message);
-  
-  // Update urgency context
-  if (field === 'urgency') {
-    state.chatContext.urgency = msgLower.includes('yes') || msgLower.includes('urgent') || msgLower.includes('time');
-  }
-  
-  // Update financial hardship context
-  if (field === 'financial_hardship') {
-    state.chatContext.financialHardship = msgLower.includes('yes') || msgLower.includes('difficult') || msgLower.includes('struggling');
-  }
-  
-  // Update category context
-  if (field === 'agency') {
-    if (msgLower.includes('traffic') || msgLower.includes('police') || msgLower.includes('lta')) {
-      state.chatContext.category = 'transport';
-    } else if (msgLower.includes('hdb') || msgLower.includes('housing')) {
-      state.chatContext.category = 'housing';
-    } else if (msgLower.includes('iras') || msgLower.includes('tax')) {
-      state.chatContext.category = 'tax_finance';
-    } else if (msgLower.includes('mom') || msgLower.includes('employment') || msgLower.includes('work')) {
-      state.chatContext.category = 'employment';
-    } else if (msgLower.includes('msf') || msgLower.includes('social') || msgLower.includes('comcare')) {
-      state.chatContext.category = 'social_support';
-    } else if (msgLower.includes('sp') || msgLower.includes('utilities') || msgLower.includes('electricity')) {
-      state.chatContext.category = 'utilities_comms';
-    }
-  }
-  
-  // Generate resource recommendations based on context
-  generateResourceRecommendations();
-}
+// Old updateChatContext function removed - now using LLM-guided context management
 
-function analyzeSentiment(message) {
-  const msgLower = message.toLowerCase();
-  let score = 0;
-  let stressLevel = 'low';
-  let tone = 'neutral';
-  
-  // Positive indicators
-  const positiveWords = ['good', 'great', 'excellent', 'happy', 'pleased', 'thankful', 'grateful', 'hopeful', 'confident', 'positive'];
-  const positiveCount = positiveWords.filter(word => msgLower.includes(word)).length;
-  score += positiveCount * 0.3;
-  
-  // Negative indicators
-  const negativeWords = ['bad', 'terrible', 'awful', 'horrible', 'frustrated', 'angry', 'upset', 'disappointed', 'worried', 'stressed'];
-  const negativeCount = negativeWords.filter(word => msgLower.includes(word)).length;
-  score -= negativeCount * 0.4;
-  
-  // Stress indicators
-  const stressWords = ['urgent', 'emergency', 'crisis', 'desperate', 'struggling', 'overwhelmed', 'anxious', 'panic', 'desperate'];
-  const stressCount = stressWords.filter(word => msgLower.includes(word)).length;
-  
-  if (stressCount >= 3) {
-    stressLevel = 'high';
-    tone = 'stressed';
-  } else if (stressCount >= 1) {
-    stressLevel = 'medium';
-    tone = 'worried';
-  }
-  
-  // Worry indicators
-  const worryWords = ['concerned', 'worried', 'anxious', 'nervous', 'uncertain', 'confused', 'lost'];
-  const worryCount = worryWords.filter(word => msgLower.includes(word)).length;
-  
-  if (worryCount >= 2 && stressLevel === 'low') {
-    tone = 'worried';
-    stressLevel = 'medium';
-  }
-  
-  // Confidence indicators
-  if (positiveCount > negativeCount && worryCount === 0) {
-    tone = 'positive';
-  }
-  
-  // Normalize score
-  score = Math.max(-1, Math.min(1, score));
-  
-  return { score, stressLevel, tone };
-}
+// Old analyzeSentiment function removed - now using LLM-guided sentiment analysis
 
-function extractKeyConcerns(message) {
-  const msgLower = message.toLowerCase();
-  const concerns = [];
-  
-  // Financial concerns
-  if (msgLower.includes('money') || msgLower.includes('financial') || msgLower.includes('bills') || msgLower.includes('debt')) {
-    concerns.push('financial_difficulties');
-  }
-  
-  // Family concerns
-  if (msgLower.includes('family') || msgLower.includes('children') || msgLower.includes('kids') || msgLower.includes('spouse')) {
-    concerns.push('family_issues');
-  }
-  
-  // Health concerns
-  if (msgLower.includes('sick') || msgLower.includes('ill') || msgLower.includes('health') || msgLower.includes('medical')) {
-    concerns.push('health_issues');
-  }
-  
-  // Employment concerns
-  if (msgLower.includes('job') || msgLower.includes('work') || msgLower.includes('employment') || msgLower.includes('unemployed')) {
-    concerns.push('employment_issues');
-  }
-  
-  // Housing concerns
-  if (msgLower.includes('house') || msgLower.includes('flat') || msgLower.includes('rent') || msgLower.includes('housing')) {
-    concerns.push('housing_issues');
-  }
-  
-  // Legal concerns
-  if (msgLower.includes('legal') || msgLower.includes('court') || msgLower.includes('law') || msgLower.includes('fine')) {
-    concerns.push('legal_issues');
-  }
-  
-  // Add unique concerns
-  concerns.forEach(concern => {
-    if (!state.chatContext.keyConcerns.includes(concern)) {
-      state.chatContext.keyConcerns.push(concern);
-    }
-  });
-}
+// Old extractKeyConcerns function removed - now using LLM-guided concern extraction
 
-function generateResourceRecommendations() {
-  const context = state.chatContext;
-  const recommendations = [];
-  
-  // Based on category
-  if (context.category === 'transport') {
-    recommendations.push({
-      name: 'Traffic Police Online Services',
-      url: 'https://www.police.gov.sg',
-      description: 'Online services for traffic violations and appeals'
-    });
-  } else if (context.category === 'housing') {
-    recommendations.push({
-      name: 'HDB e-Services',
-      url: 'https://www.hdb.gov.sg',
-      description: 'HDB online services and applications'
-    });
-  } else if (context.category === 'social_support') {
-    recommendations.push({
-      name: 'ComCare Application',
-      url: 'https://www.msf.gov.sg',
-      description: 'Apply for financial assistance'
-    });
-  }
-  
-  // Based on concerns
-  if (context.keyConcerns.includes('financial_difficulties')) {
-    recommendations.push({
-      name: 'Financial Assistance Schemes',
-      url: 'https://www.gov.sg',
-      description: 'Government financial assistance programs'
-    });
-  }
-  
-  if (context.keyConcerns.includes('employment_issues')) {
-    recommendations.push({
-      name: 'Workforce Singapore',
-      url: 'https://www.wsg.gov.sg',
-      description: 'Employment and training services'
-    });
-  }
-  
-  // Based on stress level
-  if (context.stressLevel === 'high') {
-    recommendations.push({
-      name: 'Crisis Support',
-      url: 'https://www.sos.org.sg',
-      description: '24/7 crisis support and counseling'
-    });
-  }
-  
-  state.chatContext.suggestedResources = recommendations;
-}
-
-function generateIntelligentInsights() {
-  const context = state.chatContext;
-  let insights = [];
-  
-  // Generate insights based on sentiment and concerns
-  if (context.stressLevel === 'high') {
-    insights.push('I notice you\'re experiencing high stress. The letter will emphasize the urgency and impact of your situation.');
-  }
-  
-  if (context.keyConcerns.includes('financial_difficulties')) {
-    insights.push('Given your financial difficulties, the letter will highlight available assistance programs and payment arrangements.');
-  }
-  
-  if (context.keyConcerns.includes('family_issues')) {
-    insights.push('I\'ve noted your family situation - the letter will emphasize how this affects your household and dependents.');
-  }
-  
-  if (context.urgency) {
-    insights.push('Since this is urgent, the letter will request expedited processing and immediate attention.');
-  }
-  
-  if (context.category === 'transport' && context.keyConcerns.includes('legal_issues')) {
-    insights.push('For traffic matters, the letter will focus on the specific circumstances and any mitigating factors you\'ve mentioned.');
-  }
-  
-  if (context.emotionalTone === 'positive') {
-    insights.push('Your positive attitude will be reflected in the letter\'s tone, showing cooperation and willingness to resolve the matter.');
-  }
-  
-  // Add confidence level insights
-  if (context.confidenceLevel === 'high') {
-    insights.push('Based on the information provided, I\'m confident this letter will effectively represent your case.');
-  }
-  
-  if (insights.length > 0) {
-    let insightMessage = '\n\n**Intelligent Analysis:**\n\n';
-    insights.forEach((insight, index) => {
-      insightMessage += `• ${insight}\n`;
-    });
-    insightMessage += '\nThese insights will help ensure your letter is tailored to your specific situation and needs.';
-    addChatMessage('assistant', insightMessage);
-  }
-}
-
-function showAcknowledgment(question, message) {
-  let acknowledgment = '';
-  
-  if (question.acknowledgments) {
-    if (typeof question.acknowledgments === 'object' && question.acknowledgments.yes && question.acknowledgments.no) {
-      // Yes/No question
-      const msgLower = message.toLowerCase();
-      const isYes = msgLower.includes('yes') || msgLower.includes('y') || msgLower.includes('true');
-      acknowledgment = isYes ? question.acknowledgments.yes : question.acknowledgments.no;
-    } else if (Array.isArray(question.acknowledgments)) {
-      // Open question - pick acknowledgment based on sentiment
-      const context = state.chatContext;
-      if (context.stressLevel === 'high') {
-        acknowledgment = "I can see this is really difficult for you. I'm here to help you through this.";
-      } else if (context.stressLevel === 'medium') {
-        acknowledgment = "I understand this is concerning. Let's work together to resolve this.";
-      } else if (context.emotionalTone === 'positive') {
-        acknowledgment = "That's great to hear! I'm confident we can help you with this.";
-      } else {
-        acknowledgment = question.acknowledgments[Math.floor(Math.random() * question.acknowledgments.length)];
-      }
-    }
-  }
-  
-  if (acknowledgment) {
-    addChatMessage('assistant', acknowledgment);
-  }
-}
-
-function shouldSkipQuestion(question, step) {
-  // Skip employment question if not relevant to category
-  if (question.field === 'employment_status' && state.chatContext.category && 
-      !['employment', 'social_support', 'housing'].includes(state.chatContext.category)) {
-    return true;
-  }
-  
-  // Skip financial hardship if not relevant
-  if (question.field === 'financial_hardship' && state.chatContext.category && 
-      !['social_support', 'housing', 'tax_finance', 'utilities_comms'].includes(state.chatContext.category)) {
-    return true;
-  }
-  
-  // Skip urgency if already established as urgent
-  if (question.field === 'urgency' && state.chatContext.urgency) {
-    return true;
-  }
-  
-  return false;
-}
+// Old chat helper functions removed - now using LLM-guided system
 
 /** ---------- Predict & render ---------- */
 function renderProvider(p) {
@@ -1516,8 +1183,8 @@ function renderPreds(resp) {
         <div class="flex items-center justify-between mb-3">
           <h5 class="font-semibold text-lg">${cat.top.replace('_', ' ').toUpperCase()}</h5>
           <div class="text-right">
-            <div class="text-lg font-bold text-blue-600">${Number(cat.score).toFixed(3)}</div>
-            <div class="text-xs text-gray-500">Confidence</div>
+            <div class="text-lg font-bold text-blue-600">${(window.STAFF_MODE ? Number(cat.score).toFixed(3) : '—')}</div>
+            <div class="text-xs text-gray-500">${(window.STAFF_MODE ? 'Confidence' : '')}</div>
           </div>
         </div>
         <div class="space-y-2">
@@ -1533,7 +1200,7 @@ function renderPreds(resp) {
                    </div>
                  </div>
                  <div class="text-right">
-                   <div class="text-sm font-medium">${Number(confidence).toFixed(3)}</div>
+                   <div class="text-sm font-medium">${(window.STAFF_MODE ? Number(confidence).toFixed(3) : '—')}</div>
                  </div>
                </div>
              `;
