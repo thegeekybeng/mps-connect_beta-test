@@ -1,0 +1,158 @@
+name: Deploy Frontend to Cloud Run
+
+on:
+  push:
+    branches:
+      - cloud_dev
+    paths:
+      - 'index.html'
+      - 'env.js'
+      - 'web/**'
+      - 'gemini-frontend-integration.js'
+      - '.github/workflows/deploy-frontend-cloud-run.yml'
+  workflow_dispatch:
+
+env:
+  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID || 'mpsconnect-cw-pilot' }}
+  REGION: ${{ secrets.GCP_REGION || 'asia-southeast1' }}
+  REPO: ${{ secrets.ARTIFACT_REPO || 'mps-connect' }}
+  SERVICE: mps-connect-web
+  IMAGE_TAG: web-${{ github.sha }}
+
+jobs:
+  deploy-frontend:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    concurrency:
+      group: frontend-${{ github.ref }}
+      cancel-in-progress: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Auth via Workload Identity Federation
+        if: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER != '' && secrets.GCP_SERVICE_ACCOUNT != '' }}
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Auth via Service Account Key
+        if: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER == '' && secrets.GCP_SA_KEY != '' }}
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Setup gcloud
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.PROJECT_ID }}
+
+      - name: Configure defaults
+        run: |
+          gcloud config set project "$PROJECT_ID"
+          gcloud config set run/region "${REGION}"
+
+      - name: Enable required services
+        run: |
+          gcloud services enable \
+            run.googleapis.com \
+            artifactregistry.googleapis.com \
+            iam.googleapis.com \
+            compute.googleapis.com || true
+
+      - name: Ensure Artifact Registry repo
+        run: |
+          gcloud artifacts repositories describe "$REPO" --location="$REGION" \
+            || gcloud artifacts repositories create "$REPO" \
+                 --repository-format=docker \
+                 --location="$REGION" \
+                 --description="MPS Connect images"
+
+      - name: Auth Docker to Artifact Registry
+        run: |
+          gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
+
+      - name: Build and push frontend image
+        run: |
+          IMAGE_URI="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO}/${SERVICE}:${IMAGE_TAG}"
+          echo "Building ${IMAGE_URI}"
+
+          # Use the web Dockerfile to build frontend
+          docker build -f Dockerfile.web -t "$IMAGE_URI" .
+
+          echo "Pushing ${IMAGE_URI}"
+          docker push "$IMAGE_URI"
+          echo "IMAGE_URI=${IMAGE_URI}" >> $GITHUB_ENV
+
+      - name: Deploy frontend to Cloud Run
+        run: |
+          # Grant artifact registry reader to runtime SA (idempotent)
+          PROJECT_NUMBER=$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')
+          RUNTIME_SA="${PROJECT_NUMBER}-compute@developer.gserviceaccount.com"
+          gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+            --member="serviceAccount:${RUNTIME_SA}" \
+            --role="roles/artifactregistry.reader" \
+            --quiet || true
+
+          # Deploy frontend with minimal resources
+          gcloud run deploy "$SERVICE" \
+            --image "$IMAGE_URI" \
+            --region "$REGION" \
+            --allow-unauthenticated \
+            --min-instances "0" \
+            --cpu 1 --memory 512Mi --timeout 60 \
+            --max-instances 5 \
+            --execution-environment gen2 \
+            --port 80
+
+      - name: Show frontend service URL
+        run: |
+          URL=$(gcloud run services describe "$SERVICE" --region "$REGION" --format='value(status.url)')
+          echo "Frontend URL: ${URL}"
+          echo "FRONTEND_URL=${URL}" >> $GITHUB_ENV
+
+      - name: Health check frontend
+        run: |
+          set -e
+          URL="$FRONTEND_URL"
+          echo "Checking frontend health at ${URL}"
+
+          # Wait for service to be ready
+          for i in {1..30}; do
+            CODE=$(curl -s -o /dev/null -w "%{http_code}" "$URL" || true)
+            echo "Attempt $i: HTTP $CODE"
+            if [ "$CODE" = "200" ]; then
+              echo "Frontend healthy"; exit 0; fi
+            sleep 5
+          done
+          echo "Frontend did not become healthy in time"; exit 1
+
+      - name: Update API CORS origins
+        if: ${{ success() }}
+        run: |
+          # Update the API service to allow requests from the new frontend URL
+          API_SERVICE="mps-connect-api"
+          FRONTEND_URL="$FRONTEND_URL"
+
+          echo "Updating API CORS to allow $FRONTEND_URL"
+
+          # Get current CORS origins and add new frontend URL if not already present
+          CURRENT_CORS=$(gcloud run services describe "$API_SERVICE" --region="$REGION" --format='value(spec.template.spec.containers[0].env[?name=="CORS_ORIGINS"].value)' || echo "")
+
+          if [[ "$CURRENT_CORS" != *"$FRONTEND_URL"* ]]; then
+            NEW_CORS="${CURRENT_CORS:+$CURRENT_CORS,}$FRONTEND_URL"
+            echo "New CORS origins: $NEW_CORS"
+
+            gcloud run services update "$API_SERVICE" \
+              --region="$REGION" \
+              --set-env-vars="CORS_ORIGINS=$NEW_CORS" \
+              --quiet
+          else
+            echo "Frontend URL already in CORS origins"
+          fi

@@ -36,12 +36,19 @@
 
     <!-- Settings (Hidden for case writers) -->
     <section class="bg-white shadow-sm rounded-xl p-4 sm:p-5 mb-6 border hidden">
+      <!-- Label Search Section (Hidden by default) -->
+      <div id="labelSearchSection" class="mt-4 p-4 bg-gray-50 rounded-lg hidden">
+        <h3 class="font-semibold mb-3">Label Search</h3>
+        <input id="labelSearch" class="w-full rounded-lg border px-3 py-2" placeholder="Search for labels..." />
+        <div id="labelsStatus" class="text-xs text-gray-600 mt-2">Ready to search</div>
+        <div id="labelsList" class="mt-2 max-h-40 overflow-y-auto"></div>
+      </div>
       <h2 class="font-semibold mb-3">API Settings</h2>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <label class="block">
           <span class="text-sm">API Base URL</span>
           <input id="apiBase" class="mt-1 w-full rounded-lg border px-3 py-2"
-                 placeholder="https://mps-connect-api-zbbhslvl2q-as.a.run.app" />
+                 placeholder="https://mps-connect-api-987575541268.asia-southeast1.run.app" />
         </label>
         <label class="block">
           <span class="text-sm">X-API-Key</span>
@@ -171,6 +178,10 @@
         </div>
       </div>
 
+      <!-- Legacy Result Containers (for backward compatibility) -->
+      <div id="predBody" class="hidden"></div>
+      <div id="topCats" class="hidden"></div>
+
       <!-- Letter Generation -->
       <div id="letterGeneration" class="mt-4 p-4 bg-blue-50 rounded-lg hidden">
         <h3 class="font-medium mb-3">Generate Letters for Selected Categories</h3>
@@ -206,6 +217,12 @@
             <textarea id="approvalNotes" rows="2" class="mt-1 w-full rounded-lg border px-3 py-2" placeholder="Add notes for approval decision..."></textarea>
           </label>
         </div>
+      </div>
+
+      <!-- Generated Letters Container -->
+      <div id="lettersWrap" class="mt-6 hidden">
+        <h3 class="font-medium mb-3">Generated Letters</h3>
+        <div id="lettersContainer" class="space-y-4"></div>
       </div>
     </section>
 
@@ -267,7 +284,7 @@ const qp = new URL(location.href).searchParams;
 /** ---------- Defaults (baked-in) ---------- */
 const BASE_DEFAULTS = {
   // Allow optional env.js to override these
-  apiBase: (window.API_BASE || (window.ENV && window.ENV.API_BASE)) || 'https://mps-connect-api-zbbhslvl2q-as.a.run.app',
+  apiBase: (window.API_BASE || (window.ENV && window.ENV.API_BASE)) || 'https://mps-connect-api-987575541268.asia-southeast1.run.app',
   apiKey: (window.API_KEY || (window.ENV && window.ENV.API_KEY)) || 'mps-85-whampoa',
   confidenceThreshold: 0.2,
   maxCategories: 6,
@@ -1477,6 +1494,10 @@ function renderPreds(resp) {
 
   const subCategoryList = qs('subCategoryList');
   console.log('subCategoryList element:', subCategoryList);
+  if (!subCategoryList) {
+    console.error('subCategoryList element not found!');
+    return;
+  }
   const htmlContent = `
     <div class="mb-4 p-4 bg-blue-50 rounded-lg border">
       <h4 class="font-semibold text-lg text-blue-800 mb-2">AI Analysis Results</h4>
@@ -1531,7 +1552,7 @@ function renderPreds(resp) {
   console.log('Setting HTML content, length:', htmlContent.length);
   subCategoryList.innerHTML = htmlContent;
   console.log('HTML set successfully');
-  console.log('subCategoryList after setting:', subCategoryList.innerHTML.substring(0, 200) + '...');
+  console.log('subCategoryList after setting:', subCategoryList ? subCategoryList.innerHTML.substring(0, 200) + '...' : 'null');
 }
 
 // Check if any sub-categories are selected and enable/disable letter generation
@@ -3165,15 +3186,17 @@ function generateLetters() {
   const selected = [...state.checked];
   const providers = p.providers || {};
   const fields = {
-    name: qs('fName').value.trim(),
-    nric: qs('fNRIC').value.trim(),
-    email: qs('fEmail').value.trim(),
-    phone: qs('fPhone').value.trim(),
-    addr: qs('fAddr').value.trim(),
-    pdpa: qs('pdpaSafe').checked
+    name: (qs('fName') || {value: ''}).value.trim(),
+    nric: (qs('fNRIC') || {value: ''}).value.trim(),
+    email: (qs('fEmail') || {value: ''}).value.trim(),
+    phone: (qs('fPhone') || {value: ''}).value.trim(),
+    addr: (qs('fAddr') || {value: ''}).value.trim(),
+    pdpa: (qs('pdpaSafe') || {checked: false}).checked
   };
   const caseText = qs('caseText').value.trim();
-  const wrap = qs('lettersWrap'); wrap.innerHTML = '';
+  const wrap = qs('lettersWrap');
+  if (!wrap) return;
+  wrap.innerHTML = '<h3 class="font-medium mb-3">Generated Letters</h3><div id="lettersContainer" class="space-y-4"></div>';
   selected.forEach(lab => {
     const prov = providers[lab] || {};
     const body = generateLetterTemplate(lab, prov, fields, caseText);
@@ -3288,13 +3311,24 @@ const btnClear = qs('btnClear');
 if (btnClear) {
   btnClear.addEventListener('click', () => {
     qs('caseText').value='';
-    qs('predBody').innerHTML='';
-    qs('topCats').innerHTML='';
+
+    // Clear result containers safely
+    const predBody = qs('predBody');
+    if (predBody) predBody.innerHTML='';
+
+    const topCats = qs('topCats');
+    if (topCats) topCats.innerHTML='';
+
+    const lettersWrap = qs('lettersWrap');
+    if (lettersWrap) {
+      lettersWrap.innerHTML = '<h3 class="font-medium mb-3">Generated Letters</h3><div id="lettersContainer" class="space-y-4"></div>';
+      lettersWrap.classList.add('hidden');
+    }
+
     state.preds=null; state.checked.clear();
     // keep truthAdd (human ground-truth additions) unless you want to clear:
     // state.truthAdd.clear();
     updateMetrics();
-    qs('lettersWrap').innerHTML='';
   });
 }
 

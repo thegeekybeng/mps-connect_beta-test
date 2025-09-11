@@ -29,6 +29,9 @@ lime==0.2.0.1
 captum==0.6.0
 grad-cam==1.4.0
 
+# Gemini AI Integration
+google-generativeai==0.3.2
+
 # Governance and Compliance
 requests==2.31.0
 httpx==0.25.2

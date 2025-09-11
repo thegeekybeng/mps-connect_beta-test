@@ -13,11 +13,27 @@ spec:
         run.googleapis.com/execution-environment: gen2
     spec:
       containerConcurrency: 100
-      timeoutSeconds: 300
+      timeoutSeconds: 900
       containers:
         - image: asia-southeast1-docker.pkg.dev/mpsconnect-cw-pilot/mps-connect/mps-connect-api:cloud-dev
           ports:
-            - containerPort: 8080
+            - containerPort: 8000
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: 8000
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 30
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8000
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
           resources:
             limits:
               cpu: "2"
@@ -30,7 +46,11 @@ spec:
             - name: PROVIDERS_JSON
               value: "/app/api/providers_map.json"
             - name: CORS_ORIGINS
-              value: "https://your-frontend-domain.com,http://localhost:3000,http://localhost:5173"
+              value: "https://mps-connect-web-987575541268.asia-southeast1.run.app"
+            - name: GEMINI_API_KEY
+              value: "AIzaSyAM3ykNjcF0clYJPaBqR_4a_7l-JGMTjV8"
+            - name: MPLCONFIGDIR
+              value: "/tmp"
             - name: LOG_LEVEL
               value: "INFO"
             - name: ENVIRONMENT

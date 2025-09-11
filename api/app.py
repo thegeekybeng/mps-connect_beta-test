@@ -26,21 +26,41 @@ from security.middleware import (  # type: ignore
 # pylint: disable=import-error
 from database.connection import get_db  # type: ignore
 
+# Gemini AI Integration
+try:
+    from api.gemini_integration import (
+        get_gemini_integration,
+        CaseAnalysis,
+        LetterDraft,
+        ApprovalRecommendation,
+    )
+
+    GEMINI_AVAILABLE = True
+except Exception:  # noqa: BLE001
+    GEMINI_AVAILABLE = False
+    CaseAnalysis = None
+    LetterDraft = None
+    ApprovalRecommendation = None
+
 # AI Governance imports (tolerate missing optional packages at runtime)
 # Prefer the api.* packages where available; fall back to stubs if not.
 try:  # Explainability
     from api.explainability import MPSExplainabilityEngine  # type: ignore
 except Exception:  # noqa: BLE001
+
     class MPSExplainabilityEngine:  # type: ignore
         def __init__(self, *args, **kwargs):
             pass
 
+
 try:  # Transparency
     from api.transparency import TransparencyEngine  # type: ignore
 except Exception:  # noqa: BLE001
+
     class TransparencyEngine:  # type: ignore
         def __init__(self, *args, **kwargs):
             pass
+
 
 try:  # Governance (optional)
     from api.governance import GovernanceEngine  # type: ignore
@@ -48,30 +68,38 @@ except Exception:  # noqa: BLE001
     try:
         from governance import GovernanceEngine  # type: ignore
     except Exception:  # noqa: BLE001
+
         class GovernanceEngine:  # type: ignore
             def __init__(self, *args, **kwargs):
                 pass
 
+
 try:  # Immutable storage
     from api.immutable import ImmutableStorage  # type: ignore
 except Exception:  # noqa: BLE001
+
     class ImmutableStorage:  # type: ignore
         def __init__(self, *args, **kwargs):
             pass
 
+
 try:  # Audit
     from api.audit import AuditLogger  # type: ignore
 except Exception:  # noqa: BLE001
+
     class AuditLogger:  # type: ignore
         def __init__(self, *args, **kwargs):
             pass
 
+
 try:  # Security manager
     from security import SecurityManager  # type: ignore
 except Exception:  # noqa: BLE001
+
     class SecurityManager:  # type: ignore
         def __init__(self, *args, **kwargs):
             pass
+
 
 # pylint: disable=import-error
 
@@ -127,6 +155,7 @@ DEFAULT_ALLOWED_ORIGINS = [
     "http://localhost:8080",
     "http://localhost:3000",
     "http://localhost:5173",
+    "https://mps-connect-web-987575541268.asia-southeast1.run.app",
 ]
 
 # Allow overriding via CORS_ORIGINS env (comma-separated)
@@ -483,6 +512,37 @@ class ConfidenceBreakdown(BaseModel):
     risk_level: str  # "low", "medium", "high"
 
 
+# Gemini AI Integration Models
+class CaseAnalysisRequest(BaseModel):
+    """Request model for case analysis."""
+
+    case_text: str
+    feedback: Optional[str] = None
+
+
+class LetterGenerationRequest(BaseModel):
+    """Request model for letter generation."""
+
+    case_data: Dict[str, Any]
+    feedback: Optional[str] = None
+
+
+class ApprovalRecommendationRequest(BaseModel):
+    """Request model for approval recommendations."""
+
+    case_analysis: Dict[str, Any]
+    feedback: Optional[str] = None
+
+
+class GeminiResponse(BaseModel):
+    """Generic response model for Gemini operations."""
+
+    success: bool
+    data: Optional[Dict[str, Any]] = None
+    error: Optional[str] = None
+    model_used: str  # "flash" or "pro"
+
+
 def _top_of(label: str) -> str:
     return label.split("/", 1)[0] if "/" in label else label
 
@@ -672,6 +732,137 @@ def mount_routes(prefix: str = ""):
         if pi.return_confidence_breakdown:
             result["confidence_breakdown"] = confidence_breakdowns  # type: ignore[assignment]
         return result
+
+
+# Gemini AI Integration Endpoints
+@app.post("/api/gemini/analyze-case-preview", dependencies=[Depends(require_key)])
+async def analyze_case_preview(request: CaseAnalysisRequest):
+    """Quick case analysis using Gemini Flash."""
+    if not GEMINI_AVAILABLE:
+        raise HTTPException(status_code=503, detail="Gemini AI not available")
+
+    gemini = get_gemini_integration()
+    if not gemini:
+        raise HTTPException(
+            status_code=503, detail="Gemini integration not initialized"
+        )
+
+    try:
+        analysis = await gemini.analyze_case_preview(request.case_text)
+        return GeminiResponse(success=True, data=analysis.__dict__, model_used="flash")
+    except Exception as e:
+        logger.error(f"Error in case analysis preview: {e}")
+        return GeminiResponse(success=False, error=str(e), model_used="flash")
+
+
+@app.post("/api/gemini/analyze-case-final", dependencies=[Depends(require_key)])
+async def analyze_case_final(request: CaseAnalysisRequest):
+    """Detailed case analysis using Gemini Pro."""
+    if not GEMINI_AVAILABLE:
+        raise HTTPException(status_code=503, detail="Gemini AI not available")
+
+    gemini = get_gemini_integration()
+    if not gemini:
+        raise HTTPException(
+            status_code=503, detail="Gemini integration not initialized"
+        )
+
+    try:
+        analysis = await gemini.analyze_case_final(request.case_text, request.feedback)
+        return GeminiResponse(success=True, data=analysis.__dict__, model_used="pro")
+    except Exception as e:
+        logger.error(f"Error in case analysis final: {e}")
+        return GeminiResponse(success=False, error=str(e), model_used="pro")
+
+
+@app.post("/api/gemini/generate-letter-preview", dependencies=[Depends(require_key)])
+async def generate_letter_preview(request: LetterGenerationRequest):
+    """Quick letter draft using Gemini Flash."""
+    if not GEMINI_AVAILABLE:
+        raise HTTPException(status_code=503, detail="Gemini AI not available")
+
+    gemini = get_gemini_integration()
+    if not gemini:
+        raise HTTPException(
+            status_code=503, detail="Gemini integration not initialized"
+        )
+
+    try:
+        letter = await gemini.generate_letter_preview(request.case_data)
+        return GeminiResponse(success=True, data=letter.__dict__, model_used="flash")
+    except Exception as e:
+        logger.error(f"Error in letter generation preview: {e}")
+        return GeminiResponse(success=False, error=str(e), model_used="flash")
+
+
+@app.post("/api/gemini/generate-letter-final", dependencies=[Depends(require_key)])
+async def generate_letter_final(request: LetterGenerationRequest):
+    """Polished letter using Gemini Pro."""
+    if not GEMINI_AVAILABLE:
+        raise HTTPException(status_code=503, detail="Gemini AI not available")
+
+    gemini = get_gemini_integration()
+    if not gemini:
+        raise HTTPException(
+            status_code=503, detail="Gemini integration not initialized"
+        )
+
+    try:
+        letter = await gemini.generate_letter_final(request.case_data, request.feedback)
+        return GeminiResponse(success=True, data=letter.__dict__, model_used="pro")
+    except Exception as e:
+        logger.error(f"Error in letter generation final: {e}")
+        return GeminiResponse(success=False, error=str(e), model_used="pro")
+
+
+@app.post("/api/gemini/recommend-approval-preview", dependencies=[Depends(require_key)])
+async def recommend_approval_preview(request: ApprovalRecommendationRequest):
+    """Quick approval recommendation using Gemini Flash."""
+    if not GEMINI_AVAILABLE:
+        raise HTTPException(status_code=503, detail="Gemini AI not available")
+
+    gemini = get_gemini_integration()
+    if not gemini:
+        raise HTTPException(
+            status_code=503, detail="Gemini integration not initialized"
+        )
+
+    try:
+        # Convert dict back to CaseAnalysis object
+        case_analysis = CaseAnalysis(**request.case_analysis)
+        recommendation = await gemini.recommend_approval_preview(case_analysis)
+        return GeminiResponse(
+            success=True, data=recommendation.__dict__, model_used="flash"
+        )
+    except Exception as e:
+        logger.error(f"Error in approval recommendation preview: {e}")
+        return GeminiResponse(success=False, error=str(e), model_used="flash")
+
+
+@app.post("/api/gemini/recommend-approval-final", dependencies=[Depends(require_key)])
+async def recommend_approval_final(request: ApprovalRecommendationRequest):
+    """Detailed approval recommendation using Gemini Pro."""
+    if not GEMINI_AVAILABLE:
+        raise HTTPException(status_code=503, detail="Gemini AI not available")
+
+    gemini = get_gemini_integration()
+    if not gemini:
+        raise HTTPException(
+            status_code=503, detail="Gemini integration not initialized"
+        )
+
+    try:
+        # Convert dict back to CaseAnalysis object
+        case_analysis = CaseAnalysis(**request.case_analysis)
+        recommendation = await gemini.recommend_approval_final(
+            case_analysis, request.feedback
+        )
+        return GeminiResponse(
+            success=True, data=recommendation.__dict__, model_used="pro"
+        )
+    except Exception as e:
+        logger.error(f"Error in approval recommendation final: {e}")
+        return GeminiResponse(success=False, error=str(e), model_used="pro")
 
 
 # Import and include authentication routes

@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MPS Connect Frontend Test</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="env.js"></script>
+</head>
+<body class="bg-gray-100 p-4">
+    <div class="max-w-4xl mx-auto">
+        <h1 class="text-2xl font-bold mb-4">MPS Connect Frontend Test</h1>
+
+        <div class="bg-white p-6 rounded-lg shadow-md">
+            <h2 class="text-xl font-semibold mb-4">Basic Functionality Test</h2>
+
+            <!-- Test basic elements -->
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium mb-1">API Base URL:</label>
+                    <input id="apiBase" type="text" class="w-full p-2 border rounded" placeholder="API URL">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium mb-1">API Key:</label>
+                    <input id="apiKey" type="text" class="w-full p-2 border rounded" placeholder="API Key">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium mb-1">Test Case Text:</label>
+                    <textarea id="caseText" rows="4" class="w-full p-2 border rounded" placeholder="Enter test case description..."></textarea>
+                </div>
+
+                <div class="flex gap-2">
+                    <button id="btnHealth" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">Test Health Check</button>
+                    <button id="btnPredict" class="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600">Test Prediction</button>
+                    <button id="btnClear" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">Clear</button>
+                </div>
+
+                <div id="healthOut" class="p-2 bg-gray-50 rounded text-sm"></div>
+                <div id="errMsg" class="p-2 bg-red-50 rounded text-sm text-red-700 hidden"></div>
+            </div>
+
+            <!-- Test result containers -->
+            <div class="mt-6">
+                <h3 class="text-lg font-semibold mb-2">Test Results</h3>
+                <div id="predBody" class="p-4 bg-blue-50 rounded hidden"></div>
+                <div id="topCats" class="p-4 bg-green-50 rounded hidden"></div>
+                <div id="subCategoryList" class="p-4 bg-yellow-50 rounded hidden"></div>
+                <div id="lettersWrap" class="p-4 bg-purple-50 rounded hidden"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Include the main JavaScript functions here for testing
+        const qs = (id) => document.getElementById(id);
+
+        // Test health check
+        document.getElementById('btnHealth').addEventListener('click', async () => {
+            const healthOut = qs('healthOut');
+            healthOut.textContent = 'Testing connection...';
+
+            try {
+                const apiBase = qs('apiBase').value || 'https://mps-connect-api-987575541268.asia-southeast1.run.app';
+                const apiKey = qs('apiKey').value || 'mps-85-whampoa';
+
+                const response = await fetch(`${apiBase}/healthz`, {
+                    headers: { 'X-API-Key': apiKey }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    healthOut.textContent = `✅ Success! Labels: ${data.labels}, Tops: ${data.tops}`;
+                    healthOut.className = 'p-2 bg-green-50 rounded text-sm text-green-700';
+                } else {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+            } catch (error) {
+                healthOut.textContent = `❌ Error: ${error.message}`;
+                healthOut.className = 'p-2 bg-red-50 rounded text-sm text-red-700';
+            }
+        });
+
+        // Test prediction
+        document.getElementById('btnPredict').addEventListener('click', async () => {
+            const caseText = qs('caseText').value;
+            const errMsg = qs('errMsg');
+
+            if (!caseText.trim()) {
+                errMsg.textContent = 'Please enter case text';
+                errMsg.classList.remove('hidden');
+                return;
+            }
+
+            errMsg.classList.add('hidden');
+
+            try {
+                const apiBase = qs('apiBase').value || 'https://mps-connect-api-987575541268.asia-southeast1.run.app';
+                const apiKey = qs('apiKey').value || 'mps-85-whampoa';
+
+                const response = await fetch(`${apiBase}/predict`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-API-Key': apiKey
+                    },
+                    body: JSON.stringify({
+                        texts: [caseText],
+                        threshold_top: 0.2,
+                        threshold_child: 0.2,
+                        top_k_top: 6,
+                        top_k_child: 10
+                    })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    displayTestResults(data);
+                } else {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+            } catch (error) {
+                errMsg.textContent = `Prediction failed: ${error.message}`;
+                errMsg.classList.remove('hidden');
+            }
+        });
+
+        // Clear results
+        document.getElementById('btnClear').addEventListener('click', () => {
+            qs('caseText').value = '';
+            qs('healthOut').textContent = '';
+            qs('errMsg').classList.add('hidden');
+            ['predBody', 'topCats', 'subCategoryList', 'lettersWrap'].forEach(id => {
+                const el = qs(id);
+                if (el) {
+                    el.classList.add('hidden');
+                    el.innerHTML = '';
+                }
+            });
+        });
+
+        function displayTestResults(data) {
+            console.log('Test prediction result:', data);
+
+            const predBody = qs('predBody');
+            const topCats = qs('topCats');
+            const subCategoryList = qs('subCategoryList');
+
+            if (predBody) {
+                predBody.innerHTML = `<h4>Test Prediction Results</h4><pre>${JSON.stringify(data, null, 2)}</pre>`;
+                predBody.classList.remove('hidden');
+            }
+
+            if (topCats && data.predictions && data.predictions[0]) {
+                const prediction = data.predictions[0];
+                const topCategories = prediction.top_categories || [];
+                topCats.innerHTML = `<h4>Top Categories (${topCategories.length})</h4><ul>${topCategories.map(cat => `<li>${cat.top}: ${cat.score}</li>`).join('')}</ul>`;
+                topCats.classList.remove('hidden');
+            }
+
+            if (subCategoryList && data.predictions && data.predictions[0]) {
+                const prediction = data.predictions[0];
+                const labels = prediction.labels || [];
+                subCategoryList.innerHTML = `<h4>Labels (${labels.length})</h4><div class="max-h-40 overflow-y-auto"><ul>${labels.slice(0, 20).map(label => `<li class="text-xs">${label}</li>`).join('')}</ul></div>`;
+                subCategoryList.classList.remove('hidden');
+            }
+        }
+
+        // Load default values on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            qs('apiBase').value = window.API_BASE || 'https://mps-connect-api-987575541268.asia-southeast1.run.app';
+            qs('apiKey').value = window.API_KEY || 'mps-85-whampoa';
+        });
+    </script>
+</body>
+</html>
