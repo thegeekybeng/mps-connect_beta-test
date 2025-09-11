@@ -1609,7 +1609,7 @@ function updateLetterGenerationState() {
 }
 
 // Check and generate letter for a specific category
-function checkAndGenerateLetter(category) {
+async function checkAndGenerateLetter(category) {
   const selectedSubs = Array.from(document.querySelectorAll(`input[data-category="${category}"]:checked`));
   if (selectedSubs.length === 0) {
     alert('Please select at least one sub-category for letter generation.');
@@ -1627,8 +1627,8 @@ function checkAndGenerateLetter(category) {
     return;
   }
   
-  // Generate letter content
-  const letterContent = generateLetterContent(category, selectedLabels, caseText);
+  // Generate letter content (now async)
+  const letterContent = await generateLetterContent(category, selectedLabels, caseText);
   
   // Display letter in a modal or new section
   displayLetter(category, letterContent, selectedLabels);
@@ -1747,11 +1747,75 @@ function isFieldPresent(caseText, field) {
   return pattern ? pattern.test(caseText) : false;
 }
 
-// Generate letter content based on category and selected labels
-function generateLetterContent(category, selectedLabels, caseText) {
-  // Use enhanced letter generation system
-  const subCategory = selectedLabels.find(label => label.includes('/'))?.split('/')[1] || 'general';
-  return generateEnhancedLetter(category, subCategory, caseText, selectedLabels);
+// Generate letter content using Gemini API
+async function generateLetterContent(category, selectedLabels, caseText) {
+  try {
+    // Prepare case data for Gemini
+    const caseData = {
+      category: category,
+      subCategories: selectedLabels,
+      caseText: caseText,
+      citizenName: qs('citizenName')?.value || '',
+      citizenNRIC: qs('citizenNRIC')?.value || '',
+      timestamp: new Date().toISOString()
+    };
+
+    // Call Gemini API for letter generation
+    const response = await fetch(`${getApiBase()}/api/gemini/generate-letter-final`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-API-Key': qs('apiKey').value.trim()
+      },
+      body: JSON.stringify({
+        case_data: caseData
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const result = await response.json();
+    
+    if (result.success && result.data) {
+      return result.data.content;
+    } else {
+      throw new Error(result.error || 'Letter generation failed');
+    }
+  } catch (error) {
+    console.error('Error generating letter with Gemini:', error);
+    // Fallback to simple letter generation
+    return generateSimpleLetter(category, selectedLabels, caseText);
+  }
+}
+
+// Simple fallback letter generation
+function generateSimpleLetter(category, selectedLabels, caseText) {
+  const citizenName = qs('citizenName')?.value || '[Citizen Name]';
+  const citizenNRIC = qs('citizenNRIC')?.value || '[NRIC]';
+  
+  return `Subject: Request for Assistance - ${category.replace('_', ' ').toUpperCase()}
+
+Dear Sir/Madam,
+
+I am writing on behalf of my constituent, ${citizenName} (NRIC: ${citizenNRIC}), regarding the following matter:
+
+CASE DETAILS:
+${caseText}
+
+REQUEST:
+I would like to request your kind consideration and assistance with this matter. My constituent is facing challenging circumstances and would greatly appreciate any support or guidance you can provide.
+
+I understand the importance of following proper procedures and my constituent is committed to resolving this matter responsibly.
+
+Thank you for your time and consideration.
+
+Yours faithfully,
+
+[MP Name]
+Member of Parliament for [Constituency]
+[Contact Information]`;
 }
 
 // Extract key facts from case text and paraphrase them

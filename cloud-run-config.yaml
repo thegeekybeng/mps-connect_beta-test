@@ -46,7 +46,7 @@ spec:
             - name: PROVIDERS_JSON
               value: "/app/api/providers_map.json"
             - name: CORS_ORIGINS
-              value: "https://mps-connect-web-987575541268.asia-southeast1.run.app"
+              value: "https://mps-connect-web-987575541268.asia-southeast1.run.app,https://mps-connect-testers-web-780767537881.asia-southeast1.run.app,http://localhost:8080,http://localhost:3000,http://127.0.0.1:8080,http://127.0.0.1:3000"
             - name: GEMINI_API_KEY
               value: "AIzaSyAM3ykNjcF0clYJPaBqR_4a_7l-JGMTjV8"
             - name: MPLCONFIGDIR
