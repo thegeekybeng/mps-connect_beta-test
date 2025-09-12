@@ -78,13 +78,20 @@ jobs:
         run: |
           gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
 
+      - name: Generate env.js if missing
+        run: |
+          # Provide a default env.js for the Docker build if it doesn't exist
+          if [ ! -f env.js ]; then
+            cp env.example.js env.js
+          fi
+
       - name: Build and push frontend image
         run: |
           IMAGE_URI="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO}/${SERVICE}:${IMAGE_TAG}"
           echo "Building ${IMAGE_URI}"
 
-          # Use the web Dockerfile to build frontend
-          docker build -f Dockerfile.web -t "$IMAGE_URI" .
+          # Use the Dockerfile located in the web directory to build the frontend
+          docker build -f web/Dockerfile -t "$IMAGE_URI" .
 
           echo "Pushing ${IMAGE_URI}"
           docker push "$IMAGE_URI"
